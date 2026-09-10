@@ -9,6 +9,7 @@ import { createTriggerCycleRouter } from './scheduler/triggerCycle.js';
 
 const env = loadEnv();
 const db = getFirestore(env.FIRESTORE_PROJECT_ID);
+const employeeRepository = createFirestoreEmployeeRepository(db);
 
 const app = express();
 app.use(express.json());
@@ -17,10 +18,15 @@ app.get('/healthz', (_req, res) => {
   res.status(200).send('ok');
 });
 
-app.use(createChatWebhookRouter());
+app.use(
+  createChatWebhookRouter({
+    employeeRepository,
+    googleChatProjectNumber: env.GOOGLE_CHAT_PROJECT_NUMBER,
+  }),
+);
 app.use(
   createTriggerCycleRouter({
-    employeeRepository: createFirestoreEmployeeRepository(db),
+    employeeRepository,
     matchHistoryRepository: createFirestoreMatchHistoryRepository(db),
     matchHistoryWindowCycles: env.MATCH_HISTORY_WINDOW_CYCLES,
   }),
