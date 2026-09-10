@@ -168,6 +168,9 @@ describe('trigger-cycle', () => {
       'carol@example.com',
     ]);
     expect(callArgs?.proposedDate.getDay()).toBe(4); // jeudi
+    expect(callArgs?.description).toBe(
+      "It's a match! Vous avez un rendez-vous pour un diner AlloLunch! Vous avez en commun :\nMusique: Rock",
+    );
 
     expect(sendDirectMessage).toHaveBeenCalledTimes(3);
     expect(sendDirectMessage).toHaveBeenCalledWith('spaces/alice', expect.stringContaining('Bob'));

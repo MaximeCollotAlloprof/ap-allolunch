@@ -5,7 +5,8 @@ export interface CreateLunchEventInput {
   attendeeEmails: EmployeeId[];
   /** Jour propose, calcule a partir des disponibilites communes du groupe. */
   proposedDate: Date;
-  matchGroupId: string;
+  /** Description de l'evenement (message de match + centres d'interet communs). */
+  description: string;
 }
 
 export interface CalendarService {
@@ -31,7 +32,7 @@ export function createGoogleCalendarService(organizerEmail: string): CalendarSer
   const calendar = google.calendar({ version: 'v3', auth });
 
   return {
-    async createLunchEvent({ attendeeEmails, proposedDate, matchGroupId }) {
+    async createLunchEvent({ attendeeEmails, proposedDate, description }) {
       const start = new Date(proposedDate);
       start.setHours(LUNCH_HOUR, 0, 0, 0);
       const end = new Date(start.getTime() + LUNCH_DURATION_MINUTES * 60_000);
@@ -40,7 +41,7 @@ export function createGoogleCalendarService(organizerEmail: string): CalendarSer
         calendarId: 'primary',
         requestBody: {
           summary: 'Diner AlloLunch',
-          description: `Groupe AlloLunch forme automatiquement (id: ${matchGroupId}).`,
+          description,
           start: { dateTime: start.toISOString() },
           end: { dateTime: end.toISOString() },
           attendees: attendeeEmails.map((email) => ({ email })),

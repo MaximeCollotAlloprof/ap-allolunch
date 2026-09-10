@@ -39,6 +39,14 @@ function formatMatchNotification(
   return `It's a match! Tu as un rendez-vous pour un diner AlloLunch avec ${names} !${sharedText}\n${dateText}`;
 }
 
+function formatEventDescription(sharedAnswers: readonly SharedInterestAnswer[]): string {
+  const sharedText =
+    sharedAnswers.length > 0
+      ? sharedAnswers.map((a) => `${a.categoryLabel}: ${a.answerLabel}`).join('\n')
+      : 'Aucun point commun detecte cette semaine.';
+  return `It's a match! Vous avez un rendez-vous pour un diner AlloLunch! Vous avez en commun :\n${sharedText}`;
+}
+
 /**
  * Pour chaque groupe: propose un creneau (premier jour commun), cree l'invitation
  * Calendar si possible, et notifie chaque membre par Chat. Les echecs (Calendar/Chat)
@@ -60,12 +68,17 @@ async function notifyGroups(
     const commonDay = findCommonAvailableDay(members.map((m) => m.availableDays));
     const proposedDate = commonDay ? nextDateForDayOfWeek(commonDay, startedAt) : undefined;
 
+    const sharedAnswers = computeSharedAnswers(
+      questions,
+      members.map((m) => m.interestAnswers),
+    );
+
     if (proposedDate) {
       try {
         const { eventId } = await deps.calendarService.createLunchEvent({
           attendeeEmails: members.map((m) => m.id),
           proposedDate,
-          matchGroupId: group.id,
+          description: formatEventDescription(sharedAnswers),
         });
         group.calendarEventId = eventId;
       } catch (error) {
@@ -80,11 +93,6 @@ async function notifyGroups(
         'no common available day for group, skipping calendar event',
       );
     }
-
-    const sharedAnswers = computeSharedAnswers(
-      questions,
-      members.map((m) => m.interestAnswers),
-    );
 
     for (const member of members) {
       if (!member.chatSpaceName) continue;
