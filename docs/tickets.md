@@ -14,7 +14,7 @@ interfaces deja definies dans le scaffold (`ChatCommandHandler`, `CalendarServic
 - [x] Implementer `/interets` - flow conversationnel pour choisir des tags parmi `InterestTag`.
 - [x] Implementer `/disponibilites` - saisie des jours disponibles (`DayOfWeek`).
 - [x] Implementer `/profil` - affiche le profil courant de l'employe.
-- [ ] Message de notification envoye a chaque membre d'un groupe quand un match est cree
+- [x] Message de notification envoye a chaque membre d'un groupe quand un match est cree
       (declenche depuis `scheduler/triggerCycle.ts`, a brancher).
 - [ ] Rappel automatique si un match ne repond pas apres X jours (pas de penalite, cf. CLAUDE.md).
 - [x] Gerer le cas de la commande inconnue (`/aide` listant les commandes disponibles).
@@ -37,10 +37,13 @@ interfaces deja definies dans le scaffold (`ChatCommandHandler`, `CalendarServic
 ## Lot 3 - Integration Calendar + infra/deploiement (`src/calendar/`, infra)
 
 - [ ] Configurer la delegation domain-wide du service account (Google Workspace Admin Console)
-      avec le scope `https://www.googleapis.com/auth/calendar.events`.
-- [ ] Implementer `createGoogleCalendarService` avec `googleapis` (`calendar.events.insert`),
+      avec le scope `https://www.googleapis.com/auth/calendar.events`. Non teste en conditions
+      reelles faute de credentials locaux - `createGoogleCalendarService` impersonne
+      `CALENDAR_DELEGATED_SERVICE_ACCOUNT_EMAIL` comme organisateur/sujet via
+      `GoogleAuth.clientOptions.subject`; a valider/ajuster une fois la delegation configuree.
+- [x] Implementer `createGoogleCalendarService` avec `googleapis` (`calendar.events.insert`),
       en impersonnant l'organisateur via le service account.
-- [ ] Determiner le creneau propose a partir des `availableDays` communs du groupe (regle
+- [x] Determiner le creneau propose a partir des `availableDays` communs du groupe (regle
       simple pour le MVP, ex: premier jour disponible chez tous).
 - [ ] Provisionner le projet GCP: Cloud Run, Cloud Scheduler (cron hebdomadaire ->
       `POST /scheduler/trigger-cycle`), Secret Manager, Firestore.

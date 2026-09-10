@@ -7,6 +7,8 @@ import { createFirestoreEmployeeRepository } from './db/repositories/employeeRep
 import { createFirestoreMatchHistoryRepository } from './db/repositories/matchHistoryRepository.js';
 import { createFirestoreMatchCycleRepository } from './db/repositories/matchCycleRepository.js';
 import { createChatWebhookRouter } from './chat/webhook.js';
+import { createGoogleChatNotifier } from './chat/chatNotifier.js';
+import { createGoogleCalendarService } from './calendar/calendarService.js';
 import { createTriggerCycleRouter } from './scheduler/triggerCycle.js';
 
 const env = loadEnv();
@@ -32,6 +34,8 @@ app.use(
     matchHistoryRepository: createFirestoreMatchHistoryRepository(db),
     matchCycleRepository: createFirestoreMatchCycleRepository(db),
     matchHistoryWindowCycles: env.MATCH_HISTORY_WINDOW_CYCLES,
+    calendarService: createGoogleCalendarService(env.CALENDAR_DELEGATED_SERVICE_ACCOUNT_EMAIL),
+    chatNotifier: createGoogleChatNotifier(),
   }),
 );
 
