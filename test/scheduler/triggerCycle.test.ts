@@ -136,6 +136,13 @@ describe('trigger-cycle', () => {
       interestAnswers: [buildAnswerId('musique', '1'), buildAnswerId('sport', '3')],
       chatSpaceName: 'spaces/bob',
     });
+    const carol = employee({
+      id: 'carol@example.com',
+      displayName: 'Carol',
+      availableDays: ['jeudi'],
+      interestAnswers: [buildAnswerId('musique', '1')],
+      chatSpaceName: 'spaces/carol',
+    });
 
     const createLunchEvent = createMockCalendarService(() =>
       Promise.resolve({ eventId: 'evt-123' }),
@@ -143,7 +150,7 @@ describe('trigger-cycle', () => {
     const sendDirectMessage = vi.fn(() => Promise.resolve());
 
     const { app, savedGroups } = createApp({
-      employees: [alice, bob],
+      employees: [alice, bob, carol],
       calendarService: { createLunchEvent },
       chatNotifier: { sendDirectMessage },
     });
@@ -158,17 +165,18 @@ describe('trigger-cycle', () => {
     expect(callArgs?.attendeeEmails.slice().sort()).toEqual([
       'alice@example.com',
       'bob@example.com',
+      'carol@example.com',
     ]);
     expect(callArgs?.proposedDate.getDay()).toBe(4); // jeudi
 
-    expect(sendDirectMessage).toHaveBeenCalledTimes(2);
+    expect(sendDirectMessage).toHaveBeenCalledTimes(3);
     expect(sendDirectMessage).toHaveBeenCalledWith('spaces/alice', expect.stringContaining('Bob'));
     expect(sendDirectMessage).toHaveBeenCalledWith('spaces/bob', expect.stringContaining('Alice'));
     expect(sendDirectMessage).toHaveBeenCalledWith(
       'spaces/alice',
       expect.stringContaining('Musique: Rock'),
     );
-    // Sport: reponses differentes - pas un point commun.
+    // Sport: reponses differentes (et Carol n'a pas repondu) - pas un point commun.
     expect(sendDirectMessage).toHaveBeenCalledWith(
       'spaces/alice',
       expect.not.stringContaining('Sport'),
@@ -191,6 +199,12 @@ describe('trigger-cycle', () => {
       interestAnswers: [buildAnswerId('sport', '1')],
       chatSpaceName: 'spaces/bob',
     });
+    const carol = employee({
+      id: 'carol@example.com',
+      availableDays: ['lundi'],
+      interestAnswers: [buildAnswerId('cuisine', '1')],
+      chatSpaceName: 'spaces/carol',
+    });
 
     const createLunchEvent = createMockCalendarService(() =>
       Promise.resolve({ eventId: 'evt-123' }),
@@ -198,7 +212,7 @@ describe('trigger-cycle', () => {
     const sendDirectMessage = vi.fn(() => Promise.resolve());
 
     const { app } = createApp({
-      employees: [alice, bob],
+      employees: [alice, bob, carol],
       calendarService: { createLunchEvent },
       chatNotifier: { sendDirectMessage },
     });
@@ -222,6 +236,11 @@ describe('trigger-cycle', () => {
       availableDays: ['mardi'],
       chatSpaceName: 'spaces/bob',
     });
+    const carol = employee({
+      id: 'carol@example.com',
+      availableDays: ['mercredi'],
+      chatSpaceName: 'spaces/carol',
+    });
 
     const createLunchEvent = createMockCalendarService(() =>
       Promise.resolve({ eventId: 'evt-123' }),
@@ -229,7 +248,7 @@ describe('trigger-cycle', () => {
     const sendDirectMessage = vi.fn(() => Promise.resolve());
 
     const { savedGroups, app } = createApp({
-      employees: [alice, bob],
+      employees: [alice, bob, carol],
       calendarService: { createLunchEvent },
       chatNotifier: { sendDirectMessage },
     });
@@ -251,12 +270,17 @@ describe('trigger-cycle', () => {
       availableDays: ['lundi'],
       chatSpaceName: 'spaces/bob',
     });
+    const carol = employee({
+      id: 'carol@example.com',
+      availableDays: ['lundi'],
+      chatSpaceName: 'spaces/carol',
+    });
 
     const createLunchEvent = createMockCalendarService(() => Promise.resolve({ eventId: 'evt-1' }));
     const sendDirectMessage = vi.fn(() => Promise.resolve());
 
     const { app } = createApp({
-      employees: [alice, bob],
+      employees: [alice, bob, carol],
       calendarService: { createLunchEvent },
       chatNotifier: { sendDirectMessage },
     });
@@ -264,8 +288,9 @@ describe('trigger-cycle', () => {
     const res = await triggerCycle(app);
 
     expect(res.status).toBe(200);
-    expect(sendDirectMessage).toHaveBeenCalledTimes(1);
+    expect(sendDirectMessage).toHaveBeenCalledTimes(2);
     expect(sendDirectMessage).toHaveBeenCalledWith('spaces/bob', expect.any(String));
+    expect(sendDirectMessage).toHaveBeenCalledWith('spaces/carol', expect.any(String));
   });
 
   it("un echec Calendar ou Chat n'empeche pas le cycle de se terminer normalement", async () => {
@@ -279,6 +304,11 @@ describe('trigger-cycle', () => {
       availableDays: ['lundi'],
       chatSpaceName: 'spaces/bob',
     });
+    const carol = employee({
+      id: 'carol@example.com',
+      availableDays: ['lundi'],
+      chatSpaceName: 'spaces/carol',
+    });
 
     const createLunchEvent = createMockCalendarService(() =>
       Promise.reject(new Error('calendar down')),
@@ -286,7 +316,7 @@ describe('trigger-cycle', () => {
     const sendDirectMessage = vi.fn(() => Promise.reject(new Error('chat down')));
 
     const { app, savedGroups, savedCycles } = createApp({
-      employees: [alice, bob],
+      employees: [alice, bob, carol],
       calendarService: { createLunchEvent },
       chatNotifier: { sendDirectMessage },
     });

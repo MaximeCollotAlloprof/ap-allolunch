@@ -1,6 +1,6 @@
 # AlloLunch
 
-Bot Google Chat qui associe aleatoirement des employes (2 a 4 personnes) selon leurs
+Bot Google Chat qui associe aleatoirement des employes (3 a 5 personnes) selon leurs
 centres d'interet pour diner ensemble et briser les silos. Cycle hebdomadaire automatique:
 chaque lundi, Gemini genere un nouveau questionnaire et les profils sont remis a zero;
 chaque vendredi 9h, le matching tourne et cree les notifications Chat + invitations
@@ -8,7 +8,7 @@ Google Calendar.
 
 ## Decisions produit (MVP)
 
-- **Groupes**: taille variable, 2 a 4 personnes par match.
+- **Groupes**: taille variable, 3 a 5 personnes par match.
 - **Cycle hebdomadaire IA**: chaque lundi, un agent Gemini genere une nouvelle question a
   choix multiples par categorie de centre d'interet (`POST /scheduler/weekly-reset`) et les
   centres d'interet/disponibilites de tous les employes sont effaces. Le meme jeu de

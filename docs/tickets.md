@@ -28,7 +28,7 @@ interfaces deja definies dans le scaffold (`ChatCommandHandler`, `CalendarServic
 
 ## Lot 2 - Moteur de matching + Firestore (`src/matching/`, `src/db/`)
 
-- [x] Fonction pure `formMatchGroups` (groupes 2-4, anti-repetition, gestion des isoles) -
+- [x] Fonction pure `formMatchGroups` (groupes 3-5, anti-repetition, gestion des isoles) -
       deja scaffolde et teste, a faire evoluer si de nouvelles regles emergent.
 - [x] Finaliser le schema Firestore (`employees`, `matchGroups`, `matchCycles`) et les regles
       de securite Firestore (acces restreint au service Cloud Run uniquement).

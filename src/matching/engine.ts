@@ -7,9 +7,9 @@ export interface MatchingCandidate {
 }
 
 export interface FormMatchGroupsOptions {
-  /** Taille minimale d'un groupe. Defaut: 2. */
+  /** Taille minimale d'un groupe. Defaut: 3. */
   minGroupSize?: number;
-  /** Taille maximale d'un groupe. Defaut: 4. */
+  /** Taille maximale d'un groupe. Defaut: 5. */
   maxGroupSize?: number;
   /** RNG injectable pour des tests deterministes. Defaut: Math.random. */
   random?: () => number;
@@ -34,8 +34,8 @@ export function formMatchGroups(
   recentPairs: ReadonlySet<string>,
   options: FormMatchGroupsOptions = {},
 ): FormMatchGroupsResult {
-  const minGroupSize = options.minGroupSize ?? 2;
-  const maxGroupSize = options.maxGroupSize ?? 4;
+  const minGroupSize = options.minGroupSize ?? 3;
+  const maxGroupSize = options.maxGroupSize ?? 5;
   const random = options.random ?? Math.random;
 
   const pool = shuffle(candidates, random);
@@ -79,8 +79,8 @@ export function formMatchGroups(
 
 /**
  * Determine des tailles de groupe (entre min et max) qui couvrent le plus possible de
- * candidats sans laisser de reste isole. Ex: 5 personnes, groupes 2-4 -> [3, 2] plutot
- * que de remplir un groupe de 4 et laisser 1 personne seule.
+ * candidats sans laisser de reste isole. Ex: 7 personnes, groupes 3-5 -> [4, 3] plutot
+ * que de remplir un groupe de 5 et laisser 2 personnes reportees (sous le minimum de 3).
  */
 function planGroupSizes(total: number, min: number, max: number): number[] {
   for (let deferCount = 0; deferCount < total; deferCount++) {

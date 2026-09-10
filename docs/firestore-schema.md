@@ -41,14 +41,14 @@ index simple champ, automatique.
 
 ## matchGroups
 
-Un document par groupe forme (2 a 4 employes) lors d'un cycle.
+Un document par groupe forme (3 a 5 employes) lors d'un cycle.
 
 | Champ             | Type            | Description                                                                                               |
 | ----------------- | --------------- | --------------------------------------------------------------------------------------------------------- |
 | `id`              | `string` (UUID) | Sert d'ID document.                                                                                       |
 | `cycleId`         | `string`        | Reference vers `matchCycles/{id}`.                                                                        |
 | `cycleIndex`      | `number`        | Duplique de `matchCycles.cycleIndex` - evite un lookup supplementaire pour filtrer par fenetre de cycles. |
-| `employeeIds`     | `string[]`      | Emails des membres du groupe (2 a 4).                                                                     |
+| `employeeIds`     | `string[]`      | Emails des membres du groupe (3 a 5).                                                                     |
 | `calendarEventId` | `string?`       | Rempli par le lot Calendar une fois l'invitation creee.                                                   |
 | `createdAt`       | `Timestamp`     | Date de creation du groupe.                                                                               |
 

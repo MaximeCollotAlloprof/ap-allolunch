@@ -32,9 +32,24 @@ describe('formMatchGroups', () => {
     expect(matched).toHaveLength(4);
     expect(result.deferred).toHaveLength(0);
     for (const group of result.groups) {
-      expect(group.length).toBeGreaterThanOrEqual(2);
-      expect(group.length).toBeLessThanOrEqual(4);
+      expect(group.length).toBeGreaterThanOrEqual(3);
+      expect(group.length).toBeLessThanOrEqual(5);
     }
+  });
+
+  it('utilise 3 comme taille minimale et 5 comme taille maximale par defaut', () => {
+    // 2 personnes: sous le minimum (3) par defaut -> reportees, aucun groupe forme.
+    const two = [candidate('a'), candidate('b')];
+    const resultTwo = formMatchGroups(two, new Set(), { random: fixedRandom([0]) });
+    expect(resultTwo.groups).toHaveLength(0);
+    expect(resultTwo.deferred.sort()).toEqual(['a', 'b']);
+
+    // 5 personnes: tient dans un seul groupe (maximum par defaut).
+    const five = [candidate('a'), candidate('b'), candidate('c'), candidate('d'), candidate('e')];
+    const resultFive = formMatchGroups(five, new Set(), { random: fixedRandom([0]) });
+    expect(resultFive.groups).toHaveLength(1);
+    expect(resultFive.groups[0]).toHaveLength(5);
+    expect(resultFive.deferred).toHaveLength(0);
   });
 
   it("exclut les paires recemment matchees l'une de l'autre", () => {
