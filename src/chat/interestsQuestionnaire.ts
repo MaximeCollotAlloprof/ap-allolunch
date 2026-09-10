@@ -199,6 +199,41 @@ export function formatQuestionPrompt(question: InterestQuestion): string {
   ].join('\n');
 }
 
+/** Numero (1-based, ordre d'affichage) -> question, pour /interets modifier|supprimer <numero>. */
+export function getQuestionByIndex(oneBasedIndex: number): InterestQuestion | undefined {
+  return INTEREST_QUESTIONS[oneBasedIndex - 1];
+}
+
+export function getQuestionByCategory(category: InterestTag): InterestQuestion | undefined {
+  return INTEREST_QUESTIONS.find((question) => question.category === category);
+}
+
+/** Liste numerotee des 12 categories avec la reponse actuelle, pour /interets modifier. */
+export function formatInterestsEditList(interestTags: readonly InterestTag[]): string {
+  const tagSet = new Set(interestTags);
+  const lines = INTEREST_QUESTIONS.map((question, index) => {
+    const answered = question.options.find((option) => tagSet.has(option.tag));
+    return `${index + 1}. ${question.categoryLabel}: ${answered ? answered.label : '(non repondu)'}`;
+  });
+  return [
+    "Tes centres d'interet:",
+    ...lines,
+    '',
+    'Pour changer une reponse: /interets modifier <numero>',
+    'Pour effacer une reponse: /interets supprimer <numero>',
+  ].join('\n');
+}
+
+/** Prompt affiche apres /interets modifier <numero> - reponse actuelle notee, 0 pour annuler. */
+export function formatEditPrompt(
+  question: InterestQuestion,
+  currentAnswerLabel: string | undefined,
+): string {
+  const optionLines = question.options.map((option, i) => `${i + 1}. ${option.label}`).join('\n');
+  const currentLine = currentAnswerLabel ? `Reponse actuelle: ${currentAnswerLabel}\n` : '';
+  return `Modifier: ${question.categoryLabel}\n${currentLine}${question.prompt}\n${optionLines}\n0. Annuler`;
+}
+
 /**
  * Pour l'affichage du profil: n'affiche pas le tag "large" d'une categorie quand le
  * tag specifique correspondant est deja present (redondant), et traduit chaque tag en

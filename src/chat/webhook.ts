@@ -6,8 +6,12 @@ import type { DayOfWeek, EmployeeProfile } from '../domain/types.js';
 import { createGoogleChatTokenVerifier, type BearerTokenVerifier } from './auth.js';
 import {
   findNextQuestion,
+  formatEditPrompt,
+  formatInterestsEditList,
   formatQuestionPrompt,
   getDisplayInterestLabels,
+  getQuestionByCategory,
+  getQuestionByIndex,
 } from './interestsQuestionnaire.js';
 
 export interface ChatCommandContext {
@@ -74,6 +78,8 @@ export const HELP_MESSAGE = [
   '/rejoindre - active ton profil AlloLunch (opt-in)',
   '/pause - suspend ta participation aux prochains cycles',
   "/interets - lance ou reprend le questionnaire pour affiner tes centres d'interet",
+  '/interets modifier - liste tes reponses et permet de changer une reponse',
+  '/interets supprimer <numero> - efface la reponse de cette categorie',
   `/disponibilites <jours separes par des virgules> - definit tes jours disponibles (${DAYS_OF_WEEK.join(', ')})`,
   '/profil - affiche ton profil actuel',
   '/aide - affiche ce message',
@@ -139,25 +145,67 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
       const profile = await employeeRepository.findById(ctx.employeeId);
       if (!profile) return NO_PROFILE_MESSAGE;
 
+      const [action, indexRaw] = (ctx.argument ?? '').trim().toLowerCase().split(/\s+/);
+
+      if (action === 'modifier' && !indexRaw) {
+        return formatInterestsEditList(profile.interestTags);
+      }
+
+      if (action === 'modifier' && indexRaw) {
+        const question = getQuestionByIndex(Number.parseInt(indexRaw, 10));
+        if (!question) {
+          return 'Numero invalide. Tape /interets modifier pour voir la liste des categories.';
+        }
+        await employeeRepository.upsert({
+          ...profile,
+          interestsEditingCategory: question.category,
+          updatedAt: new Date(),
+        });
+        const current = question.options.find((o) => profile.interestTags.includes(o.tag));
+        return formatEditPrompt(question, current?.label);
+      }
+
+      if (action === 'supprimer' && indexRaw) {
+        const question = getQuestionByIndex(Number.parseInt(indexRaw, 10));
+        if (!question) {
+          return 'Numero invalide. Tape /interets modifier pour voir la liste des categories.';
+        }
+        const categoryTags = new Set([question.category, ...question.options.map((o) => o.tag)]);
+        const updatedTags = profile.interestTags.filter((tag) => !categoryTags.has(tag));
+        await employeeRepository.upsert({
+          ...profile,
+          interestTags: updatedTags,
+          updatedAt: new Date(),
+        });
+        return `Reponse supprimee pour ${question.categoryLabel}. Tape /interets modifier pour voir ton profil.`;
+      }
+
+      if (action) {
+        return 'Argument non reconnu. Tape /interets, /interets modifier ou /interets supprimer <numero>.';
+      }
+
+      // /interets sans argument: reprend le questionnaire sequentiel a la prochaine
+      // question sans reponse. Une modification en cours (/interets modifier <n>) est
+      // abandonnee pour eviter d'interpreter la prochaine reponse au mauvais endroit.
       const nextQuestion = findNextQuestion(profile.interestTags);
       if (!nextQuestion) {
-        if (profile.interestsQuestionnaireActive) {
+        if (profile.interestsQuestionnaireActive || profile.interestsEditingCategory) {
           await employeeRepository.upsert({
             ...profile,
             interestsQuestionnaireActive: false,
+            interestsEditingCategory: undefined,
             updatedAt: new Date(),
           });
         }
         return "Ton profil de centres d'interet est deja complet ! Tape /profil pour le voir.";
       }
 
-      if (!profile.interestsQuestionnaireActive) {
-        await employeeRepository.upsert({
-          ...profile,
-          interestsQuestionnaireActive: true,
-          updatedAt: new Date(),
-        });
-      }
+      await employeeRepository.upsert({
+        ...profile,
+        interestsQuestionnaireActive: true,
+        interestsEditingCategory: undefined,
+        updatedAt: new Date(),
+      });
       return formatQuestionPrompt(nextQuestion);
     },
 
@@ -233,6 +281,63 @@ async function handleInterestsAnswer(
   return `Enregistre : ${selected.label}.\n\n${formatQuestionPrompt(nextQuestion)}`;
 }
 
+/**
+ * Traite un message texte brut comme une reponse a une modification ciblee en cours
+ * (/interets modifier <numero>) - appele en priorite sur handleInterestsAnswer quand
+ * `profile.interestsEditingCategory` est defini (voir createChatWebhookRouter).
+ */
+async function handleCategoryEditAnswer(
+  employeeRepository: EmployeeRepository,
+  profile: EmployeeProfile,
+  rawAnswer: string,
+): Promise<string> {
+  const question = profile.interestsEditingCategory
+    ? getQuestionByCategory(profile.interestsEditingCategory)
+    : undefined;
+  if (!question) {
+    await employeeRepository.upsert({
+      ...profile,
+      interestsEditingCategory: undefined,
+      updatedAt: new Date(),
+    });
+    return 'Rien a modifier pour le moment. Tape /interets pour continuer ton profil.';
+  }
+
+  const trimmed = rawAnswer.trim();
+  if (trimmed === '0') {
+    await employeeRepository.upsert({
+      ...profile,
+      interestsEditingCategory: undefined,
+      updatedAt: new Date(),
+    });
+    return 'Modification annulee.';
+  }
+
+  const choiceIndex = Number.parseInt(trimmed, 10) - 1;
+  const selected =
+    Number.isInteger(choiceIndex) && trimmed !== '' ? question.options[choiceIndex] : undefined;
+  if (!selected) {
+    const current = question.options.find((o) => profile.interestTags.includes(o.tag));
+    return `Reponse invalide.\n\n${formatEditPrompt(question, current?.label)}`;
+  }
+
+  const categoryTags = new Set([question.category, ...question.options.map((o) => o.tag)]);
+  const updatedTags = [
+    ...profile.interestTags.filter((tag) => !categoryTags.has(tag)),
+    question.category,
+    selected.tag,
+  ];
+
+  await employeeRepository.upsert({
+    ...profile,
+    interestTags: updatedTags,
+    interestsEditingCategory: undefined,
+    updatedAt: new Date(),
+  });
+
+  return `Mis a jour: ${question.categoryLabel}: ${selected.label}.`;
+}
+
 export interface ChatWebhookDeps extends ChatCommandDeps {
   chatWebhookUrl: string;
   /** Injectable pour les tests - par defaut verifie le token via Google (google-auth-library). */
@@ -280,10 +385,16 @@ export function createChatWebhookRouter(deps: ChatWebhookDeps): Router {
     const senderEmail = message?.sender?.email;
 
     try {
-      // Un message texte brut (pas une commande) pendant un questionnaire /interets en
-      // cours est interprete comme une reponse (numero de choix, ou 0 pour arreter).
+      // Un message texte brut (pas une commande) est interprete comme une reponse au
+      // questionnaire /interets en cours - en priorite une modification ciblee
+      // (/interets modifier <numero>), sinon la progression sequentielle normale.
       if (senderEmail && !text.startsWith('/')) {
         const profile = await employeeRepository.findById(senderEmail);
+        if (profile?.interestsEditingCategory) {
+          const reply = await handleCategoryEditAnswer(employeeRepository, profile, text);
+          sendChatReply(res, reply);
+          return;
+        }
         if (profile?.interestsQuestionnaireActive) {
           const reply = await handleInterestsAnswer(employeeRepository, profile, text);
           sendChatReply(res, reply);

@@ -125,6 +125,13 @@ export interface EmployeeProfile {
    * qui n'est pas une reponse synchrone a une requete entrante - voir src/chat/chatNotifier.ts.
    */
   chatSpaceName?: string;
+  /**
+   * Categorie ciblee par /interets modifier <numero> - le prochain message texte brut
+   * (numero de choix, ou 0 pour annuler) modifie cette categorie precise plutot que la
+   * prochaine question sans reponse. `| undefined` explicite pour pouvoir l'effacer une
+   * fois la modification faite ou annulee (cf. exactOptionalPropertyTypes).
+   */
+  interestsEditingCategory?: InterestTag | undefined;
   createdAt: Date;
   updatedAt: Date;
 }

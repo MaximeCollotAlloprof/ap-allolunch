@@ -248,6 +248,80 @@ describe('chat webhook', () => {
     expect(res.text).toMatch(/actif/);
   });
 
+  it("/interets modifier liste les 12 categories avec la reponse actuelle ou 'non repondu'", async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    await sendMessage(app, '/interets');
+    await sendMessage(app, '1'); // cuisine -> Italienne
+    const res = await sendMessage(app, '/interets modifier');
+
+    expect(res.text).toMatch(/1\. Cuisine: Italienne/);
+    expect(res.text).toMatch(/2\. Sport: \(non repondu\)/);
+  });
+
+  it('/interets modifier <numero> permet de changer une reponse existante', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    await sendMessage(app, '/interets');
+    await sendMessage(app, '1'); // cuisine -> Italienne
+
+    const editRes = await sendMessage(app, '/interets modifier 1');
+    expect(editRes.text).toMatch(/Modifier: Cuisine/);
+    expect(editRes.text).toMatch(/Reponse actuelle: Italienne/);
+
+    const res = await sendMessage(app, '2'); // -> Asiatique
+    expect(res.text).toMatch(/Mis a jour: Cuisine: Asiatique/);
+
+    const profile = await repo.findById('alice@example.com');
+    expect(profile?.interestTags).toEqual(['cuisine', 'cuisine-asiatique']);
+    expect(profile?.interestsEditingCategory).toBeUndefined();
+  });
+
+  it('0 pendant une modification annule sans changer la reponse existante', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    await sendMessage(app, '/interets');
+    await sendMessage(app, '1'); // cuisine -> Italienne
+    await sendMessage(app, '/interets modifier 1');
+
+    const res = await sendMessage(app, '0');
+    expect(res.text).toMatch(/annulee/);
+
+    const profile = await repo.findById('alice@example.com');
+    expect(profile?.interestTags).toEqual(['cuisine', 'cuisine-italienne']);
+  });
+
+  it('/interets supprimer <numero> efface la reponse sans passer par une conversation', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    await sendMessage(app, '/interets');
+    await sendMessage(app, '1'); // cuisine -> Italienne
+    await sendMessage(app, '1'); // sport -> Hockey
+
+    const res = await sendMessage(app, '/interets supprimer 1');
+    expect(res.text).toMatch(/Reponse supprimee pour Cuisine/);
+
+    const profile = await repo.findById('alice@example.com');
+    expect(profile?.interestTags).toEqual(['sport', 'sport-hockey']);
+  });
+
+  it('/interets modifier <numero invalide> renvoie une erreur explicite', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    const res = await sendMessage(app, '/interets modifier 99');
+    expect(res.text).toMatch(/Numero invalide/);
+  });
+
   it('commande inconnue renvoie la liste des commandes', async () => {
     const app = createApp(createInMemoryEmployeeRepository());
     const res = await sendMessage(app, '/blabla');
