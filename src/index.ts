@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { loadEnv } from './config/env.js';
 import { logger } from './logger.js';
