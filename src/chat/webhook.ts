@@ -198,7 +198,10 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
       // /interets sans argument: reprend le questionnaire sequentiel a la prochaine
       // question sans reponse. Une modification en cours (/interets modifier <n>) est
       // abandonnee pour eviter d'interpreter la prochaine reponse au mauvais endroit.
-      const nextQuestion = findNextQuestion(profile.interestTags);
+      const nextQuestion = findNextQuestion(
+        profile.interestTags,
+        profile.interestsSkippedCategories ?? [],
+      );
       if (!nextQuestion) {
         if (profile.interestsQuestionnaireActive || profile.interestsEditingCategory) {
           await employeeRepository.upsert({
@@ -247,7 +250,8 @@ async function handleInterestsAnswer(
   profile: EmployeeProfile,
   rawAnswer: string,
 ): Promise<string> {
-  const question = findNextQuestion(profile.interestTags);
+  const skipped = profile.interestsSkippedCategories ?? [];
+  const question = findNextQuestion(profile.interestTags, skipped);
   if (!question) {
     await employeeRepository.upsert({
       ...profile,
@@ -267,6 +271,23 @@ async function handleInterestsAnswer(
     return 'Questionnaire mis en pause. Tape /interets quand tu veux reprendre.';
   }
 
+  if (trimmed.toLowerCase() === 'passer') {
+    const updatedSkipped = [...new Set([...skipped, question.category])];
+    const nextQuestion = findNextQuestion(profile.interestTags, updatedSkipped);
+
+    await employeeRepository.upsert({
+      ...profile,
+      interestsSkippedCategories: updatedSkipped,
+      interestsQuestionnaireActive: !!nextQuestion,
+      updatedAt: new Date(),
+    });
+
+    if (!nextQuestion) {
+      return "Question passee.\n\nTon profil de centres d'interet est complet ! Tape /profil pour le voir.";
+    }
+    return `Question passee.\n\n${formatQuestionPrompt(nextQuestion)}`;
+  }
+
   const choiceIndex = Number.parseInt(trimmed, 10) - 1;
   const selected =
     Number.isInteger(choiceIndex) && trimmed !== '' ? question.options[choiceIndex] : undefined;
@@ -275,7 +296,7 @@ async function handleInterestsAnswer(
   }
 
   const updatedTags = [...new Set([...profile.interestTags, question.category, selected.tag])];
-  const nextQuestion = findNextQuestion(updatedTags);
+  const nextQuestion = findNextQuestion(updatedTags, skipped);
 
   await employeeRepository.upsert({
     ...profile,

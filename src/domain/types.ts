@@ -131,6 +131,13 @@ export interface EmployeeProfile {
    * prochaine question sans reponse.
    */
   interestsEditingCategory?: InterestTag;
+  /**
+   * Categories "passees" via l'option "passer" du questionnaire /interets - reproposees
+   * seulement une fois toutes les autres questions sans reponse traitees. Ne participe
+   * jamais au matching (contrairement a interestTags) - sert uniquement a ordonner le
+   * questionnaire.
+   */
+  interestsSkippedCategories?: InterestTag[];
   createdAt: Date;
   updatedAt: Date;
 }

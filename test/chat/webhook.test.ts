@@ -127,7 +127,6 @@ describe('chat webhook', () => {
     await sendMessage(app, '/rejoindre');
     const res = await sendMessage(app, '/interets');
 
-    expect(res.text).toMatch(/Question 1\/12/);
     expect(res.text).toMatch(/cuisine/i);
     expect(res.text).toMatch(/1\. Italienne/);
     const profile = await repo.findById('alice@example.com');
@@ -143,7 +142,7 @@ describe('chat webhook', () => {
     const res = await sendMessage(app, '1');
 
     expect(res.text).toMatch(/Enregistre : Italienne/);
-    expect(res.text).toMatch(/Question 2\/12/);
+    expect(res.text).toMatch(/sport/i);
     const profile = await repo.findById('alice@example.com');
     expect(profile?.interestTags).toEqual(['cuisine', 'cuisine-italienne']);
     expect(profile?.interestsQuestionnaireActive).toBe(true);
@@ -158,7 +157,7 @@ describe('chat webhook', () => {
     const res = await sendMessage(app, '99');
 
     expect(res.text).toMatch(/Reponse invalide/);
-    expect(res.text).toMatch(/Question 1\/12/);
+    expect(res.text).toMatch(/cuisine/i);
     const profile = await repo.findById('alice@example.com');
     expect(profile?.interestTags).toEqual([]);
   });
@@ -187,8 +186,44 @@ describe('chat webhook', () => {
     await sendMessage(app, '0'); // pause sur la question sport
 
     const res = await sendMessage(app, '/interets');
-    expect(res.text).toMatch(/Question 2\/12/);
     expect(res.text).toMatch(/sport/i);
+  });
+
+  it("'passer' passe a la question suivante sans enregistrer de reponse", async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    await sendMessage(app, '/interets');
+    const res = await sendMessage(app, 'passer');
+
+    expect(res.text).toMatch(/Question passee/);
+    expect(res.text).toMatch(/sport/i);
+    const profile = await repo.findById('alice@example.com');
+    expect(profile?.interestTags).toEqual([]);
+    expect(profile?.interestsSkippedCategories).toEqual(['cuisine']);
+  });
+
+  it('une question passee revient a la fin une fois toutes les autres traitees', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    await sendMessage(app, '/interets');
+    await sendMessage(app, 'passer'); // passe cuisine
+
+    let last = { status: 200, text: '' };
+    for (let i = 0; i < 11; i++) {
+      last = await sendMessage(app, '1'); // repond aux 11 autres categories
+    }
+
+    // la 11e reponse doit redemander cuisine (seule categorie restante, passee)
+    expect(last.text).toMatch(/cuisine/i);
+
+    const res = await sendMessage(app, '1'); // repond enfin cuisine -> Italienne
+    expect(res.text).toMatch(/complet/);
+    const profile = await repo.findById('alice@example.com');
+    expect(profile?.interestTags).toContain('cuisine-italienne');
   });
 
   it('un numero envoye sans questionnaire actif tombe sur la commande inconnue', async () => {

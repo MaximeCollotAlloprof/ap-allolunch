@@ -181,21 +181,30 @@ const TAG_LABELS: ReadonlyMap<InterestTag, string> = new Map(
   ]),
 );
 
-/** Premiere question dont aucune reponse n'a encore ete enregistree, ou undefined si complet. */
+/**
+ * Premiere question sans reponse, ou undefined si complet. Les categories "passees"
+ * (skippedCategories - via l'option "passer" du questionnaire) sont reproposees en
+ * dernier recours, une fois toutes les autres questions sans reponse traitees.
+ */
 export function findNextQuestion(
   interestTags: readonly InterestTag[],
+  skippedCategories: readonly InterestTag[] = [],
 ): InterestQuestion | undefined {
   const answered = new Set(interestTags);
-  return INTEREST_QUESTIONS.find((question) => !question.options.some((o) => answered.has(o.tag)));
+  const skipped = new Set(skippedCategories);
+  const pending = INTEREST_QUESTIONS.filter(
+    (question) => !question.options.some((o) => answered.has(o.tag)),
+  );
+  return pending.find((question) => !skipped.has(question.category)) ?? pending[0];
 }
 
 export function formatQuestionPrompt(question: InterestQuestion): string {
-  const index = INTEREST_QUESTIONS.indexOf(question);
   const optionLines = question.options.map((option, i) => `${i + 1}. ${option.label}`).join('\n');
   return [
-    `(Question ${index + 1}/${INTEREST_QUESTIONS.length}) ${question.prompt}`,
+    question.prompt,
     optionLines,
     '0. Arreter (tu pourras reprendre plus tard avec /interets)',
+    'passer - passe cette question, elle reviendra a la fin',
   ].join('\n');
 }
 
