@@ -171,7 +171,7 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
 }
 
 export interface ChatWebhookDeps extends ChatCommandDeps {
-  googleChatProjectNumber: string;
+  chatWebhookUrl: string;
   /** Injectable pour les tests - par defaut verifie le token via Google (google-auth-library). */
   verifyBearerToken?: BearerTokenVerifier;
 }
@@ -180,7 +180,7 @@ export function createChatWebhookRouter(deps: ChatWebhookDeps): Router {
   const router = Router();
   const commandHandlers = createCommandHandlers(deps);
   const verifyBearerToken =
-    deps.verifyBearerToken ?? createGoogleChatTokenVerifier(deps.googleChatProjectNumber);
+    deps.verifyBearerToken ?? createGoogleChatTokenVerifier(deps.chatWebhookUrl);
 
   router.post('/chat/webhook', async (req: Request, res: Response) => {
     const isVerified = await verifyBearerToken(req.headers.authorization);
@@ -189,14 +189,19 @@ export function createChatWebhookRouter(deps: ChatWebhookDeps): Router {
       return;
     }
 
+    type ChatMessage = { text?: string; sender?: { email?: string; displayName?: string } };
     const event = req.body as {
-      message?: { text?: string; sender?: { email?: string; displayName?: string } };
+      chat?: {
+        appCommandPayload?: { message?: ChatMessage };
+        messagePayload?: { message?: ChatMessage };
+      };
     };
-    const text = event.message?.text?.trim() ?? '';
+    const message = event.chat?.appCommandPayload?.message ?? event.chat?.messagePayload?.message;
+    const text = message?.text?.trim() ?? '';
     const [command, ...rest] = text.split(/\s+/);
 
     const handler = command ? commandHandlers[command] : undefined;
-    if (!handler || !event.message?.sender?.email) {
+    if (!handler || !message?.sender?.email) {
       res.json({
         text: `Commande inconnue. Tapez /aide pour la liste des commandes.\n\n${HELP_MESSAGE}`,
       });
@@ -206,13 +211,13 @@ export function createChatWebhookRouter(deps: ChatWebhookDeps): Router {
     try {
       const argument = rest.join(' ');
       const reply = await handler({
-        employeeId: event.message.sender.email,
-        displayName: event.message.sender.displayName ?? event.message.sender.email,
+        employeeId: message.sender.email,
+        displayName: message.sender.displayName ?? message.sender.email,
         ...(argument ? { argument } : {}),
       });
       res.json({ text: reply });
     } catch (error) {
-      logger.error({ error }, 'chat command failed');
+      logger.error({ err: error }, 'chat command failed');
       res.status(500).json({ text: 'Une erreur est survenue, reessayez plus tard.' });
     }
   });

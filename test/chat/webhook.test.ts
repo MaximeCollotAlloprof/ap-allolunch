@@ -29,7 +29,7 @@ function createApp(employeeRepository: EmployeeRepository) {
   app.use(
     createChatWebhookRouter({
       employeeRepository,
-      googleChatProjectNumber: '123456',
+      chatWebhookUrl: 'https://example.com/chat/webhook',
       verifyBearerToken: () => Promise.resolve(true),
     }),
   );
@@ -48,7 +48,9 @@ async function sendMessage(
 ): Promise<WebhookResponse> {
   const res: unknown = await request(app)
     .post('/chat/webhook')
-    .send({ message: { text, sender: { email, displayName: 'Alice' } } });
+    .send({
+      chat: { appCommandPayload: { message: { text, sender: { email, displayName: 'Alice' } } } },
+    });
   return res as WebhookResponse;
 }
 
@@ -59,7 +61,7 @@ describe('chat webhook', () => {
     app.use(
       createChatWebhookRouter({
         employeeRepository: createInMemoryEmployeeRepository(),
-        googleChatProjectNumber: '123456',
+        chatWebhookUrl: 'https://example.com/chat/webhook',
         verifyBearerToken: () => Promise.resolve(false),
       }),
     );

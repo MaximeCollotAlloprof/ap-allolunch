@@ -40,16 +40,27 @@ d'authentification GCP au demarrage - si vous en voyez une, verifiez que
 
 ## 4. Simuler un message Google Chat
 
-```bash
-curl -X POST http://localhost:8080/chat/webhook \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <id_token_google_chat>" \
-  -d '{"message":{"text":"/profil","sender":{"email":"test@alloprof.qc.ca","displayName":"Test"}}}'
-```
+Le webhook verifie desormais le token Bearer signe par Google (`src/chat/auth.ts`) avant
+tout traitement - un `curl` avec un faux token recoit donc directement un `401`. Pour
+tester la logique des commandes sans passer par un vrai token, le plus simple est de
+s'appuyer sur `test/chat/webhook.test.ts`, qui injecte un `verifyBearerToken` stub. Pour
+un test en conditions reelles avec un vrai token Google, voir la section 6 (tunnel).
 
-Tant que les commandes du lot 1 ne sont pas implementees, la reponse attendue est une
-erreur 500 explicite (`/profil: not implemented yet`) - ca confirme que le routage et le
-parsing de la requete fonctionnent.
+A titre de reference, le format reel d'un evenement Google Chat (app configuree via
+l'API Google Chat / Workspace Add-ons) ressemble a:
+
+```json
+{
+  "chat": {
+    "appCommandPayload": {
+      "message": {
+        "text": "/profil",
+        "sender": { "email": "test@alloprof.qc.ca", "displayName": "Test" }
+      }
+    }
+  }
+}
+```
 
 ## 5. Declencher un cycle de matching
 
@@ -82,12 +93,11 @@ serveur local pour tester le bot en conditions reelles avant un deploiement.
 5. Copier l'URL HTTPS affichee (ex: `https://xxxx.ngrok-free.app`) et la coller comme
    "HTTP endpoint URL" dans la configuration de l'app Google Chat (console Google Cloud
    > Google Chat API > Configuration), suivie de `/chat/webhook`.
-
-**Important**: le webhook n'a pas encore de verification du token Bearer envoye par
-Google Chat (voir le TODO dans `src/chat/webhook.ts` et le lot 1 de `docs/tickets.md`).
-Ne laissez pas le tunnel actif plus longtemps que necessaire pour vos tests tant que
-cette verification n'est pas implementee - l'URL ngrok gratuite est publique et devinable
-par quiconque la scanne.
+6. Mettre a jour `CHAT_WEBHOOK_URL` dans `.env` avec cette meme URL complete
+   (`https://xxxx.ngrok-free.app/chat/webhook`) et redemarrer `npm run dev` - c'est
+   l'audience que le webhook attend dans le token signe par Google (`src/chat/auth.ts`).
+   Sur le plan gratuit ngrok, l'URL change a chaque redemarrage du tunnel: repeter cette
+   etape (console Chat + `.env`) a chaque fois.
 
 ## 7. Avant de deployer sur GCP
 
