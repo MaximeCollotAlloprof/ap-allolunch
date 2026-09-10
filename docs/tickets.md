@@ -23,12 +23,12 @@ interfaces deja definies dans le scaffold (`ChatCommandHandler`, `CalendarServic
 
 - [x] Fonction pure `formMatchGroups` (groupes 2-4, anti-repetition, gestion des isoles) -
       deja scaffolde et teste, a faire evoluer si de nouvelles regles emergent.
-- [ ] Finaliser le schema Firestore (`employees`, `matchGroups`, `matchCycles`) et les regles
+- [x] Finaliser le schema Firestore (`employees`, `matchGroups`, `matchCycles`) et les regles
       de securite Firestore (acces restreint au service Cloud Run uniquement).
-- [ ] Completer `matchHistoryRepository.getRecentPairs` si la requete par `limit` s'avere
+- [x] Completer `matchHistoryRepository.getRecentPairs` si la requete par `limit` s'avere
       insuffisante a l'echelle (envisager un champ `cycleIndex` pour filtrer proprement par
       fenetre de N cycles plutot qu'un `limit` approximatif).
-- [ ] Ajouter la persistance du `matchCycle` (statut `pending` -> `completed`) autour de
+- [x] Ajouter la persistance du `matchCycle` (statut `pending` -> `completed`) autour de
       l'appel a `formMatchGroups` dans `triggerCycle.ts`.
 - [ ] Tests d'integration Firestore (emulateur) pour les repositories.
 - [ ] Definir et documenter la politique de retention des donnees (combien de temps garder

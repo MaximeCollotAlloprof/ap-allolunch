@@ -4,6 +4,7 @@ import { logger } from './logger.js';
 import { getFirestore } from './db/firestore.js';
 import { createFirestoreEmployeeRepository } from './db/repositories/employeeRepository.js';
 import { createFirestoreMatchHistoryRepository } from './db/repositories/matchHistoryRepository.js';
+import { createFirestoreMatchCycleRepository } from './db/repositories/matchCycleRepository.js';
 import { createChatWebhookRouter } from './chat/webhook.js';
 import { createTriggerCycleRouter } from './scheduler/triggerCycle.js';
 
@@ -28,6 +29,7 @@ app.use(
   createTriggerCycleRouter({
     employeeRepository,
     matchHistoryRepository: createFirestoreMatchHistoryRepository(db),
+    matchCycleRepository: createFirestoreMatchCycleRepository(db),
     matchHistoryWindowCycles: env.MATCH_HISTORY_WINDOW_CYCLES,
   }),
 );
