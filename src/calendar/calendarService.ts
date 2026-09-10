@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { google } from 'googleapis';
 import type { EmployeeId } from '../domain/types.js';
 
@@ -17,8 +18,9 @@ const LUNCH_HOUR = 12;
 const LUNCH_DURATION_MINUTES = 60;
 
 /**
- * Cree l'invitation via `googleapis` (calendar.events.insert) en utilisant un service
- * account avec delegation domain-wide (scope calendar.events), en impersonnant
+ * Cree l'invitation via `googleapis` (calendar.events.insert) avec un lien Google Meet
+ * genere automatiquement (`conferenceData`/`conferenceDataVersion: 1`), en utilisant un
+ * service account avec delegation domain-wide (scope calendar.events), en impersonnant
  * `organizerEmail` (`CALENDAR_DELEGATED_SERVICE_ACCOUNT_EMAIL` - un des employes du
  * groupe, ou une boite partagee "AlloLunch"). Le service account qui execute ce code
  * (credentials par defaut de l'environnement, ex: Cloud Run) doit deja avoir ete autorise
@@ -39,12 +41,19 @@ export function createGoogleCalendarService(organizerEmail: string): CalendarSer
 
       const response = await calendar.events.insert({
         calendarId: 'primary',
+        conferenceDataVersion: 1,
         requestBody: {
           summary: 'Diner AlloLunch',
           description,
           start: { dateTime: start.toISOString() },
           end: { dateTime: end.toISOString() },
           attendees: attendeeEmails.map((email) => ({ email })),
+          conferenceData: {
+            createRequest: {
+              requestId: randomUUID(),
+              conferenceSolutionKey: { type: 'hangoutsMeet' },
+            },
+          },
         },
       });
 
