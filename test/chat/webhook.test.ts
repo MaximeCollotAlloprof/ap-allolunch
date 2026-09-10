@@ -120,28 +120,106 @@ describe('chat webhook', () => {
     expect(profile?.status).toBe('paused');
   });
 
-  it('/interets valide et enregistre les tags connus', async () => {
+  it('/interets lance le questionnaire sur la premiere question non repondue', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
     await sendMessage(app, '/rejoindre');
-    const res = await sendMessage(app, '/interets cuisine, sport');
+    const res = await sendMessage(app, '/interets');
 
-    expect(res.text).toMatch(/cuisine, sport/);
+    expect(res.text).toMatch(/Question 1\/12/);
+    expect(res.text).toMatch(/cuisine/i);
+    expect(res.text).toMatch(/1\. Italienne/);
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestTags).toEqual(['cuisine', 'sport']);
+    expect(profile?.interestsQuestionnaireActive).toBe(true);
   });
 
-  it('/interets rejette les tags inconnus sans modifier le profil', async () => {
+  it('une reponse valide (numero) enregistre le tag et enchaine sur la question suivante', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
     await sendMessage(app, '/rejoindre');
-    const res = await sendMessage(app, '/interets cuisine,escrime');
+    await sendMessage(app, '/interets');
+    const res = await sendMessage(app, '1');
 
-    expect(res.text).toMatch(/inconnu/);
+    expect(res.text).toMatch(/Enregistre : Italienne/);
+    expect(res.text).toMatch(/Question 2\/12/);
+    const profile = await repo.findById('alice@example.com');
+    expect(profile?.interestTags).toEqual(['cuisine', 'cuisine-italienne']);
+    expect(profile?.interestsQuestionnaireActive).toBe(true);
+  });
+
+  it('une reponse invalide redemande la meme question sans modifier le profil', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    await sendMessage(app, '/interets');
+    const res = await sendMessage(app, '99');
+
+    expect(res.text).toMatch(/Reponse invalide/);
+    expect(res.text).toMatch(/Question 1\/12/);
     const profile = await repo.findById('alice@example.com');
     expect(profile?.interestTags).toEqual([]);
+  });
+
+  it('repondre 0 met le questionnaire en pause sans modifier le profil', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    await sendMessage(app, '/interets');
+    const res = await sendMessage(app, '0');
+
+    expect(res.text).toMatch(/pause/);
+    const profile = await repo.findById('alice@example.com');
+    expect(profile?.interestsQuestionnaireActive).toBe(false);
+    expect(profile?.interestTags).toEqual([]);
+  });
+
+  it('/interets reprend a la question suivante apres une pause (pas de redemarrage)', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    await sendMessage(app, '/interets');
+    await sendMessage(app, '1'); // repond cuisine, avance sur sport (question 2)
+    await sendMessage(app, '0'); // pause sur la question sport
+
+    const res = await sendMessage(app, '/interets');
+    expect(res.text).toMatch(/Question 2\/12/);
+    expect(res.text).toMatch(/sport/i);
+  });
+
+  it('un numero envoye sans questionnaire actif tombe sur la commande inconnue', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    const res = await sendMessage(app, '2');
+
+    expect(res.text).toMatch(/Commande inconnue/);
+  });
+
+  it('repondre a toutes les questions termine le questionnaire', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    await sendMessage(app, '/interets');
+
+    let last = { status: 200, text: '' };
+    for (let i = 0; i < 12; i++) {
+      last = await sendMessage(app, '1');
+    }
+
+    expect(last.text).toMatch(/complet/);
+    const profile = await repo.findById('alice@example.com');
+    expect(profile?.interestsQuestionnaireActive).toBe(false);
+    expect(profile?.interestTags).toHaveLength(24); // 12 categories + 12 tags specifiques
+
+    const res = await sendMessage(app, '/interets');
+    expect(res.text).toMatch(/deja complet/);
   });
 
   it('/disponibilites valide et enregistre les jours connus', async () => {
@@ -156,15 +234,17 @@ describe('chat webhook', () => {
     expect(profile?.availableDays).toEqual(['lundi', 'jeudi']);
   });
 
-  it('/profil affiche le profil courant', async () => {
+  it('/profil affiche le libelle specifique sans repeter la categorie large', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
     await sendMessage(app, '/rejoindre');
-    await sendMessage(app, '/interets cuisine');
+    await sendMessage(app, '/interets');
+    await sendMessage(app, '1'); // cuisine -> Italienne
     const res = await sendMessage(app, '/profil');
 
-    expect(res.text).toMatch(/cuisine/);
+    expect(res.text).toMatch(/Italienne/);
+    expect(res.text).not.toMatch(/cuisine/i);
     expect(res.text).toMatch(/actif/);
   });
 
