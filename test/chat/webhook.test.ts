@@ -23,7 +23,9 @@ function createInMemoryEmployeeRepository(): EmployeeRepository {
   };
 }
 
-function createApp(employeeRepository: EmployeeRepository) {
+// Par defaut, toujours choisir le premier candidat (comportement deterministe et
+// coherent avec l'ordre de INTEREST_QUESTIONS) - un test dedie verifie la randomisation.
+function createApp(employeeRepository: EmployeeRepository, random: () => number = () => 0) {
   const app = express();
   app.use(express.json());
   app.use(
@@ -31,6 +33,7 @@ function createApp(employeeRepository: EmployeeRepository) {
       employeeRepository,
       chatWebhookUrl: 'https://example.com/chat/webhook',
       verifyBearerToken: () => Promise.resolve(true),
+      random,
     }),
   );
   return app;
@@ -133,6 +136,17 @@ describe('chat webhook', () => {
     expect(profile?.interestsQuestionnaireActive).toBe(true);
   });
 
+  it("l'ordre des questions depend du random injecte (pas toujours cuisine en premier)", async () => {
+    const repo = createInMemoryEmployeeRepository();
+    // random proche de 1: pointe vers le dernier candidat (entrepreneuriat, 12e categorie).
+    const app = createApp(repo, () => 0.999);
+
+    await sendMessage(app, '/rejoindre');
+    const res = await sendMessage(app, '/interets');
+
+    expect(res.text).toMatch(/entrepreneuriat/i);
+  });
+
   it('une reponse valide (numero) enregistre le tag et enchaine sur la question suivante', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
@@ -162,40 +176,13 @@ describe('chat webhook', () => {
     expect(profile?.interestTags).toEqual([]);
   });
 
-  it('repondre 0 met le questionnaire en pause sans modifier le profil', async () => {
+  it('repondre 0 passe la question suivante sans enregistrer de reponse', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
     await sendMessage(app, '/rejoindre');
     await sendMessage(app, '/interets');
     const res = await sendMessage(app, '0');
-
-    expect(res.text).toMatch(/pause/);
-    const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestsQuestionnaireActive).toBe(false);
-    expect(profile?.interestTags).toEqual([]);
-  });
-
-  it('/interets reprend a la question suivante apres une pause (pas de redemarrage)', async () => {
-    const repo = createInMemoryEmployeeRepository();
-    const app = createApp(repo);
-
-    await sendMessage(app, '/rejoindre');
-    await sendMessage(app, '/interets');
-    await sendMessage(app, '1'); // repond cuisine, avance sur sport (question 2)
-    await sendMessage(app, '0'); // pause sur la question sport
-
-    const res = await sendMessage(app, '/interets');
-    expect(res.text).toMatch(/sport/i);
-  });
-
-  it("'passer' passe a la question suivante sans enregistrer de reponse", async () => {
-    const repo = createInMemoryEmployeeRepository();
-    const app = createApp(repo);
-
-    await sendMessage(app, '/rejoindre');
-    await sendMessage(app, '/interets');
-    const res = await sendMessage(app, 'passer');
 
     expect(res.text).toMatch(/Question passee/);
     expect(res.text).toMatch(/sport/i);
@@ -204,13 +191,26 @@ describe('chat webhook', () => {
     expect(profile?.interestsSkippedCategories).toEqual(['cuisine']);
   });
 
+  it('/interets propose la categorie suivante apres avoir passe une question (pas de redemarrage)', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    await sendMessage(app, '/interets');
+    await sendMessage(app, '1'); // repond cuisine, avance sur sport
+    await sendMessage(app, '0'); // passe sport
+
+    const res = await sendMessage(app, '/interets');
+    expect(res.text).toMatch(/voyage/i);
+  });
+
   it('une question passee revient a la fin une fois toutes les autres traitees', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
     await sendMessage(app, '/rejoindre');
     await sendMessage(app, '/interets');
-    await sendMessage(app, 'passer'); // passe cuisine
+    await sendMessage(app, '0'); // passe cuisine
 
     let last = { status: 200, text: '' };
     for (let i = 0; i < 11; i++) {

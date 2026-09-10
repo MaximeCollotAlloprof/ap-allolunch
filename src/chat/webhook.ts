@@ -98,10 +98,12 @@ export const HELP_MESSAGE = [
 
 export interface ChatCommandDeps {
   employeeRepository: EmployeeRepository;
+  /** Injectable pour des tests deterministes - ordre aleatoire des questions /interets. */
+  random?: () => number;
 }
 
 export function createCommandHandlers(deps: ChatCommandDeps): Record<string, ChatCommandHandler> {
-  const { employeeRepository } = deps;
+  const { employeeRepository, random } = deps;
 
   return {
     '/aide': () => Promise.resolve(HELP_MESSAGE),
@@ -201,6 +203,7 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
       const nextQuestion = findNextQuestion(
         profile.interestTags,
         profile.interestsSkippedCategories ?? [],
+        random,
       );
       if (!nextQuestion) {
         if (profile.interestsQuestionnaireActive || profile.interestsEditingCategory) {
@@ -249,9 +252,10 @@ async function handleInterestsAnswer(
   employeeRepository: EmployeeRepository,
   profile: EmployeeProfile,
   rawAnswer: string,
+  random: (() => number) | undefined,
 ): Promise<string> {
   const skipped = profile.interestsSkippedCategories ?? [];
-  const question = findNextQuestion(profile.interestTags, skipped);
+  const question = findNextQuestion(profile.interestTags, skipped, random);
   if (!question) {
     await employeeRepository.upsert({
       ...profile,
@@ -262,18 +266,10 @@ async function handleInterestsAnswer(
   }
 
   const trimmed = rawAnswer.trim();
-  if (trimmed === '0') {
-    await employeeRepository.upsert({
-      ...profile,
-      interestsQuestionnaireActive: false,
-      updatedAt: new Date(),
-    });
-    return 'Questionnaire mis en pause. Tape /interets quand tu veux reprendre.';
-  }
 
-  if (trimmed.toLowerCase() === 'passer') {
+  if (trimmed === '0') {
     const updatedSkipped = [...new Set([...skipped, question.category])];
-    const nextQuestion = findNextQuestion(profile.interestTags, updatedSkipped);
+    const nextQuestion = findNextQuestion(profile.interestTags, updatedSkipped, random);
 
     await employeeRepository.upsert({
       ...profile,
@@ -296,7 +292,7 @@ async function handleInterestsAnswer(
   }
 
   const updatedTags = [...new Set([...profile.interestTags, question.category, selected.tag])];
-  const nextQuestion = findNextQuestion(updatedTags, skipped);
+  const nextQuestion = findNextQuestion(updatedTags, skipped, random);
 
   await employeeRepository.upsert({
     ...profile,
@@ -385,7 +381,7 @@ function sendChatReply(res: Response, text: string, status = 200): void {
 
 export function createChatWebhookRouter(deps: ChatWebhookDeps): Router {
   const router = Router();
-  const { employeeRepository } = deps;
+  const { employeeRepository, random } = deps;
   const commandHandlers = createCommandHandlers(deps);
   const verifyBearerToken =
     deps.verifyBearerToken ?? createGoogleChatTokenVerifier(deps.chatWebhookUrl);
@@ -423,7 +419,7 @@ export function createChatWebhookRouter(deps: ChatWebhookDeps): Router {
           return;
         }
         if (profile?.interestsQuestionnaireActive) {
-          const reply = await handleInterestsAnswer(employeeRepository, profile, text);
+          const reply = await handleInterestsAnswer(employeeRepository, profile, text, random);
           sendChatReply(res, reply);
           return;
         }

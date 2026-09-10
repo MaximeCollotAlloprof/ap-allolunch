@@ -182,30 +182,34 @@ const TAG_LABELS: ReadonlyMap<InterestTag, string> = new Map(
 );
 
 /**
- * Premiere question sans reponse, ou undefined si complet. Les categories "passees"
- * (skippedCategories - via l'option "passer" du questionnaire) sont reproposees en
- * dernier recours, une fois toutes les autres questions sans reponse traitees.
+ * Question sans reponse choisie aleatoirement (ordre different a chaque appel), ou
+ * undefined si complet. Les categories "passees" (skippedCategories - repondre 0 a une
+ * question) sont reproposees en dernier recours, une fois toutes les autres traitees.
+ * `random` est injectable pour des tests deterministes (meme convention que
+ * src/matching/engine.ts) - defaut Math.random.
  */
 export function findNextQuestion(
   interestTags: readonly InterestTag[],
   skippedCategories: readonly InterestTag[] = [],
+  random: () => number = Math.random,
 ): InterestQuestion | undefined {
   const answered = new Set(interestTags);
   const skipped = new Set(skippedCategories);
   const pending = INTEREST_QUESTIONS.filter(
     (question) => !question.options.some((o) => answered.has(o.tag)),
   );
-  return pending.find((question) => !skipped.has(question.category)) ?? pending[0];
+  if (pending.length === 0) return undefined;
+
+  const notSkipped = pending.filter((question) => !skipped.has(question.category));
+  const candidates = notSkipped.length > 0 ? notSkipped : pending;
+  return candidates[Math.floor(random() * candidates.length)];
 }
 
 export function formatQuestionPrompt(question: InterestQuestion): string {
   const optionLines = question.options.map((option, i) => `${i + 1}. ${option.label}`).join('\n');
-  return [
-    question.prompt,
-    optionLines,
-    '0. Arreter (tu pourras reprendre plus tard avec /interets)',
-    'passer - passe cette question, elle reviendra a la fin',
-  ].join('\n');
+  return [question.prompt, optionLines, '0. Passer cette question (elle reviendra a la fin)'].join(
+    '\n',
+  );
 }
 
 /** Numero (1-based, ordre d'affichage) -> question, pour /interets modifier|supprimer <numero>. */

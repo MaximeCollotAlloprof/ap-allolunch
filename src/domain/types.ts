@@ -132,7 +132,7 @@ export interface EmployeeProfile {
    */
   interestsEditingCategory?: InterestTag;
   /**
-   * Categories "passees" via l'option "passer" du questionnaire /interets - reproposees
+   * Categories "passees" en repondant 0 a une question du questionnaire /interets - reproposees
    * seulement une fois toutes les autres questions sans reponse traitees. Ne participe
    * jamais au matching (contrairement a interestTags) - sert uniquement a ordonner le
    * questionnaire.
