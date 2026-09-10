@@ -1,185 +1,49 @@
-import type { InterestTag } from '../domain/types.js';
-
-export interface InterestQuestionOption {
-  tag: InterestTag;
-  label: string;
-}
-
-export interface InterestQuestion {
-  /** Tag "large" de la categorie, ajoute au profil en plus du tag specifique choisi. */
-  category: InterestTag;
-  categoryLabel: string;
-  prompt: string;
-  options: readonly InterestQuestionOption[];
-}
+import type { InterestCategory, WeeklyQuestion, WeeklyQuestionOption } from '../domain/types.js';
 
 /**
- * Une question par categorie de InterestTag, dans l'ordre ou elles sont posees. Chaque
- * reponse ajoute au profil a la fois le tag "large" (`category`) et le tag "specifique"
- * choisi, pour permettre un matching a deux niveaux de granularite.
+ * Une reponse est stockee comme `${category}:${optionId}` (ex: "musique:opt-3") dans
+ * EmployeeProfile.interestAnswers - un seul identifiant encode a la fois la categorie et
+ * le choix precis, sans dependre du texte affiche (qui change chaque semaine).
  */
-export const INTEREST_QUESTIONS: readonly InterestQuestion[] = [
-  {
-    category: 'cuisine',
-    categoryLabel: 'Cuisine',
-    prompt: 'Quel type de cuisine preferes-tu pour un diner ?',
-    options: [
-      { tag: 'cuisine-italienne', label: 'Italienne' },
-      { tag: 'cuisine-asiatique', label: 'Asiatique' },
-      { tag: 'cuisine-mexicaine', label: 'Mexicaine' },
-      { tag: 'cuisine-vegetarienne', label: 'Vegetarienne' },
-      { tag: 'cuisine-quebecoise', label: 'Quebecoise' },
-      { tag: 'cuisine-street-food', label: 'Street food' },
-    ],
-  },
-  {
-    category: 'sport',
-    categoryLabel: 'Sport',
-    prompt: 'Quel sport te passionne le plus ?',
-    options: [
-      { tag: 'sport-hockey', label: 'Hockey' },
-      { tag: 'sport-soccer', label: 'Soccer' },
-      { tag: 'sport-course', label: 'Course a pied' },
-      { tag: 'sport-musculation', label: 'Musculation / gym' },
-      { tag: 'sport-raquette', label: 'Sports de raquette' },
-      { tag: 'sport-aquatique', label: 'Sports aquatiques' },
-    ],
-  },
-  {
-    category: 'voyage',
-    categoryLabel: 'Voyage',
-    prompt: 'Quel type de voyage te fait le plus rever ?',
-    options: [
-      { tag: 'voyage-plage', label: 'Plage et detente' },
-      { tag: 'voyage-aventure', label: 'Aventure / nature' },
-      { tag: 'voyage-grandes-villes', label: 'Grandes villes' },
-      { tag: 'voyage-road-trip', label: 'Road trip' },
-      { tag: 'voyage-sac-a-dos', label: 'Sac a dos' },
-      { tag: 'voyage-tout-inclus', label: 'Tout inclus' },
-    ],
-  },
-  {
-    category: 'technologie',
-    categoryLabel: 'Technologie',
-    prompt: 'Quel domaine tech t’interesse le plus ?',
-    options: [
-      { tag: 'technologie-ia', label: 'Intelligence artificielle' },
-      { tag: 'technologie-developpement', label: 'Developpement logiciel' },
-      { tag: 'technologie-gadgets', label: 'Gadgets et electronique' },
-      { tag: 'technologie-cybersecurite', label: 'Cybersecurite' },
-      { tag: 'technologie-jeux-high-tech', label: 'Jeux et high-tech' },
-    ],
-  },
-  {
-    category: 'jeux-video',
-    categoryLabel: 'Jeux video',
-    prompt: 'Quel genre de jeu video preferes-tu ?',
-    options: [
-      { tag: 'jeux-video-action-aventure', label: 'Action / aventure' },
-      { tag: 'jeux-video-strategie', label: 'Strategie' },
-      { tag: 'jeux-video-rpg', label: 'RPG' },
-      { tag: 'jeux-video-sport-course', label: 'Sport / course' },
-      { tag: 'jeux-video-multijoueur', label: 'Multijoueur' },
-      { tag: 'jeux-video-mobile', label: 'Mobile' },
-    ],
-  },
-  {
-    category: 'lecture',
-    categoryLabel: 'Lecture',
-    prompt: 'Quel genre de lecture preferes-tu ?',
-    options: [
-      { tag: 'lecture-romans', label: 'Romans' },
-      { tag: 'lecture-essais', label: 'Essais / documentaires' },
-      { tag: 'lecture-science-fiction', label: 'Science-fiction' },
-      { tag: 'lecture-polar', label: 'Polar / thriller' },
-      { tag: 'lecture-bd', label: 'Bandes dessinees' },
-      { tag: 'lecture-developpement-personnel', label: 'Developpement personnel' },
-    ],
-  },
-  {
-    category: 'musique',
-    categoryLabel: 'Musique',
-    prompt: 'Quel est ton style de musique prefere ?',
-    options: [
-      { tag: 'musique-rock', label: 'Rock' },
-      { tag: 'musique-pop', label: 'Pop' },
-      { tag: 'musique-rap', label: 'Rap / hip-hop' },
-      { tag: 'musique-electro', label: 'Electro' },
-      { tag: 'musique-jazz', label: 'Jazz / blues' },
-      { tag: 'musique-classique', label: 'Classique' },
-    ],
-  },
-  {
-    category: 'cinema',
-    categoryLabel: 'Cinema',
-    prompt: 'Quel genre de film preferes-tu ?',
-    options: [
-      { tag: 'cinema-action', label: 'Action' },
-      { tag: 'cinema-comedie', label: 'Comedie' },
-      { tag: 'cinema-drame', label: 'Drame' },
-      { tag: 'cinema-horreur', label: 'Horreur / thriller' },
-      { tag: 'cinema-science-fiction', label: 'Science-fiction' },
-      { tag: 'cinema-documentaire', label: 'Documentaire' },
-    ],
-  },
-  {
-    category: 'plein-air',
-    categoryLabel: 'Plein air',
-    prompt: 'Quelle activite de plein air preferes-tu ?',
-    options: [
-      { tag: 'plein-air-randonnee', label: 'Randonnee' },
-      { tag: 'plein-air-velo', label: 'Velo' },
-      { tag: 'plein-air-camping', label: 'Camping' },
-      { tag: 'plein-air-sports-hiver', label: 'Sports d’hiver' },
-      { tag: 'plein-air-jardinage', label: 'Jardinage' },
-      { tag: 'plein-air-peche-chasse', label: 'Peche / chasse' },
-    ],
-  },
-  {
-    category: 'art-creatif',
-    categoryLabel: 'Art creatif',
-    prompt: 'Quelle activite creative te ressemble le plus ?',
-    options: [
-      { tag: 'art-creatif-dessin', label: 'Dessin / peinture' },
-      { tag: 'art-creatif-photographie', label: 'Photographie' },
-      { tag: 'art-creatif-instrument', label: 'Instrument de musique' },
-      { tag: 'art-creatif-ecriture', label: 'Ecriture' },
-      { tag: 'art-creatif-artisanat', label: 'Artisanat / DIY' },
-      { tag: 'art-creatif-danse', label: 'Danse' },
-    ],
-  },
-  {
-    category: 'famille-enfants',
-    categoryLabel: 'Famille et enfants',
-    prompt: 'Qu’est-ce qui decrit le mieux ta situation ?',
-    options: [
-      { tag: 'famille-enfants-jeunes-enfants', label: 'Parent de jeunes enfants' },
-      { tag: 'famille-enfants-ados', label: 'Parent d’ados' },
-      { tag: 'famille-enfants-futur-parent', label: 'Futur parent' },
-      { tag: 'famille-enfants-activites-familiales', label: 'Aime les activites familiales' },
-      { tag: 'famille-enfants-sans-enfants', label: 'Pas d’enfants' },
-    ],
-  },
-  {
-    category: 'entrepreneuriat',
-    categoryLabel: 'Entrepreneuriat',
-    prompt: 'Quel aspect de l’entrepreneuriat t’interesse le plus ?',
-    options: [
-      { tag: 'entrepreneuriat-startup', label: 'Lancer une startup' },
-      { tag: 'entrepreneuriat-investissement', label: 'Investissement' },
-      { tag: 'entrepreneuriat-freelance', label: 'Freelance / side projects' },
-      { tag: 'entrepreneuriat-leadership', label: 'Leadership / gestion' },
-      { tag: 'entrepreneuriat-innovation', label: 'Innovation produit' },
-    ],
-  },
-];
+export function buildAnswerId(category: InterestCategory, optionId: string): string {
+  return `${category}:${optionId}`;
+}
 
-const TAG_LABELS: ReadonlyMap<InterestTag, string> = new Map(
-  INTEREST_QUESTIONS.flatMap((question) => [
-    [question.category, question.categoryLabel] as const,
-    ...question.options.map((option) => [option.tag, option.label] as const),
-  ]),
-);
+/** Option actuellement choisie pour cette question parmi les reponses de l'employe, si presente. */
+export function getCurrentAnswer(
+  question: WeeklyQuestion,
+  interestAnswers: readonly string[],
+): WeeklyQuestionOption | undefined {
+  return question.options.find((option) =>
+    interestAnswers.includes(buildAnswerId(question.category, option.id)),
+  );
+}
+
+/** Retire la reponse (s'il y en a une) donnee pour cette categorie. */
+export function removeAnswerForCategory(
+  interestAnswers: readonly string[],
+  category: InterestCategory,
+): string[] {
+  return interestAnswers.filter((answer) => !answer.startsWith(`${category}:`));
+}
+
+function parseAnswerId(answer: string): { category: string; optionId: string } | undefined {
+  const separatorIndex = answer.indexOf(':');
+  if (separatorIndex === -1) return undefined;
+  return {
+    category: answer.slice(0, separatorIndex),
+    optionId: answer.slice(separatorIndex + 1),
+  };
+}
+
+function mapAnswersByCategory(interestAnswers: readonly string[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const answer of interestAnswers) {
+    const parsed = parseAnswerId(answer);
+    if (parsed) map.set(parsed.category, parsed.optionId);
+  }
+  return map;
+}
 
 /**
  * Question sans reponse choisie aleatoirement (ordre different a chaque appel), ou
@@ -189,15 +53,14 @@ const TAG_LABELS: ReadonlyMap<InterestTag, string> = new Map(
  * src/matching/engine.ts) - defaut Math.random.
  */
 export function findNextQuestion(
-  interestTags: readonly InterestTag[],
-  skippedCategories: readonly InterestTag[] = [],
+  questions: readonly WeeklyQuestion[],
+  interestAnswers: readonly string[],
+  skippedCategories: readonly InterestCategory[] = [],
   random: () => number = Math.random,
-): InterestQuestion | undefined {
-  const answered = new Set(interestTags);
+): WeeklyQuestion | undefined {
+  const answeredCategories = new Set(mapAnswersByCategory(interestAnswers).keys());
   const skipped = new Set(skippedCategories);
-  const pending = INTEREST_QUESTIONS.filter(
-    (question) => !question.options.some((o) => answered.has(o.tag)),
-  );
+  const pending = questions.filter((question) => !answeredCategories.has(question.category));
   if (pending.length === 0) return undefined;
 
   const notSkipped = pending.filter((question) => !skipped.has(question.category));
@@ -205,7 +68,7 @@ export function findNextQuestion(
   return candidates[Math.floor(random() * candidates.length)];
 }
 
-export function formatQuestionPrompt(question: InterestQuestion): string {
+export function formatQuestionPrompt(question: WeeklyQuestion): string {
   const optionLines = question.options.map((option, i) => `${i + 1}. ${option.label}`).join('\n');
   return [question.prompt, optionLines, '0. Passer cette question (elle reviendra a la fin)'].join(
     '\n',
@@ -213,12 +76,18 @@ export function formatQuestionPrompt(question: InterestQuestion): string {
 }
 
 /** Numero (1-based, ordre d'affichage) -> question, pour /interets modifier|supprimer <numero>. */
-export function getQuestionByIndex(oneBasedIndex: number): InterestQuestion | undefined {
-  return INTEREST_QUESTIONS[oneBasedIndex - 1];
+export function getQuestionByIndex(
+  questions: readonly WeeklyQuestion[],
+  oneBasedIndex: number,
+): WeeklyQuestion | undefined {
+  return questions[oneBasedIndex - 1];
 }
 
-export function getQuestionByCategory(category: InterestTag): InterestQuestion | undefined {
-  return INTEREST_QUESTIONS.find((question) => question.category === category);
+export function getQuestionByCategory(
+  questions: readonly WeeklyQuestion[],
+  category: InterestCategory,
+): WeeklyQuestion | undefined {
+  return questions.find((question) => question.category === category);
 }
 
 /**
@@ -226,12 +95,18 @@ export function getQuestionByCategory(category: InterestTag): InterestQuestion |
  * avec /interets modifier|supprimer <numero>), pour /interets modifier. Les categories
  * sans reponse ne sont pas affichees - /interets s'occupe de les proposer.
  */
-export function formatInterestsEditList(interestTags: readonly InterestTag[]): string {
-  const tagSet = new Set(interestTags);
-  const lines = INTEREST_QUESTIONS.map((question, index) => {
-    const answered = question.options.find((option) => tagSet.has(option.tag));
-    return answered ? `${index + 1}. ${question.categoryLabel}: ${answered.label}` : undefined;
-  }).filter((line): line is string => line !== undefined);
+export function formatInterestsEditList(
+  questions: readonly WeeklyQuestion[],
+  interestAnswers: readonly string[],
+): string {
+  const answered = mapAnswersByCategory(interestAnswers);
+  const lines = questions
+    .map((question, index) => {
+      const optionId = answered.get(question.category);
+      const option = optionId ? question.options.find((o) => o.id === optionId) : undefined;
+      return option ? `${index + 1}. ${question.categoryLabel}: ${option.label}` : undefined;
+    })
+    .filter((line): line is string => line !== undefined);
 
   if (lines.length === 0) {
     return "Tu n'as pas encore repondu a une question. Tape /interets pour commencer.";
@@ -248,7 +123,7 @@ export function formatInterestsEditList(interestTags: readonly InterestTag[]): s
 
 /** Prompt affiche apres /interets modifier <numero> - reponse actuelle notee, 0 pour annuler. */
 export function formatEditPrompt(
-  question: InterestQuestion,
+  question: WeeklyQuestion,
   currentAnswerLabel: string | undefined,
 ): string {
   const optionLines = question.options.map((option, i) => `${i + 1}. ${option.label}`).join('\n');
@@ -256,23 +131,19 @@ export function formatEditPrompt(
   return `Modifier: ${question.categoryLabel}\n${currentLine}${question.prompt}\n${optionLines}\n0. Annuler`;
 }
 
-/**
- * Pour l'affichage du profil: n'affiche pas le tag "large" d'une categorie quand le
- * tag specifique correspondant est deja present (redondant), et traduit chaque tag en
- * libelle lisible.
- */
-export function getDisplayInterestLabels(interestTags: readonly InterestTag[]): string[] {
-  const tagSet = new Set(interestTags);
-  const specificTagsByCategory = new Map(
-    INTEREST_QUESTIONS.map((question) => [question.category, question.options.map((o) => o.tag)]),
-  );
-
-  return interestTags
-    .filter((tag) => {
-      const specifics = specificTagsByCategory.get(tag);
-      return !specifics || !specifics.some((specific) => tagSet.has(specific));
-    })
-    .map((tag) => TAG_LABELS.get(tag) ?? tag);
+/** Pour l'affichage du profil: traduit chaque reponse en libelle lisible, dans l'ordre des questions. */
+export function getDisplayInterestLabels(
+  questions: readonly WeeklyQuestion[],
+  interestAnswers: readonly string[],
+): string[] {
+  const answered = mapAnswersByCategory(interestAnswers);
+  const labels: string[] = [];
+  for (const question of questions) {
+    const optionId = answered.get(question.category);
+    const option = optionId ? question.options.find((o) => o.id === optionId) : undefined;
+    if (option) labels.push(option.label);
+  }
+  return labels;
 }
 
 export interface SharedInterestAnswer {
@@ -281,24 +152,29 @@ export interface SharedInterestAnswer {
 }
 
 /**
- * Pour chaque question du questionnaire, ne retient la categorie que si tous les
- * membres ont choisi exactement la meme reponse specifique (pas juste repondu a la
- * meme categorie avec des reponses differentes - ex: Sport/Soccer vs Sport/Raquette
- * n'est pas un point commun).
+ * Pour chaque question, ne retient la categorie que si tous les membres ont choisi
+ * exactement la meme reponse (comparaison de l'identifiant complet
+ * `${category}:${optionId}` - pas juste repondu a la meme categorie avec des reponses
+ * differentes).
  */
 export function computeSharedAnswers(
-  membersInterestTags: readonly (readonly InterestTag[])[],
+  questions: readonly WeeklyQuestion[],
+  membersInterestAnswers: readonly (readonly string[])[],
 ): SharedInterestAnswer[] {
-  if (membersInterestTags.length === 0) return [];
+  if (membersInterestAnswers.length === 0) return [];
 
   const shared: SharedInterestAnswer[] = [];
-  for (const question of INTEREST_QUESTIONS) {
-    const answers = membersInterestTags.map((tags) =>
-      question.options.find((option) => tags.includes(option.tag)),
+  for (const question of questions) {
+    const answersForQuestion = membersInterestAnswers.map((answers) =>
+      answers.find((answer) => parseAnswerId(answer)?.category === question.category),
     );
-    const [first, ...rest] = answers;
-    if (first && rest.every((answer) => answer?.tag === first.tag)) {
-      shared.push({ categoryLabel: question.categoryLabel, answerLabel: first.label });
+    const [first, ...rest] = answersForQuestion;
+    if (first && rest.every((answer) => answer === first)) {
+      const optionId = parseAnswerId(first)?.optionId;
+      const option = question.options.find((o) => o.id === optionId);
+      if (option) {
+        shared.push({ categoryLabel: question.categoryLabel, answerLabel: option.label });
+      }
     }
   }
   return shared;

@@ -4,10 +4,12 @@ import { findNextQuestion } from '../chat/interestsQuestionnaire.js';
 import type { ChatNotifier } from '../chat/chatNotifier.js';
 import { logger } from '../logger.js';
 import type { EmployeeRepository } from '../db/repositories/employeeRepository.js';
+import type { WeeklyQuestionSetRepository } from '../db/repositories/weeklyQuestionSetRepository.js';
 import type { EmployeeProfile } from '../domain/types.js';
 
 export interface InterestsReminderDeps {
   employeeRepository: EmployeeRepository;
+  weeklyQuestionSetRepository: WeeklyQuestionSetRepository;
   chatNotifier: ChatNotifier;
 }
 
@@ -25,10 +27,17 @@ export function createInterestsReminderRouter(deps: InterestsReminderDeps): Rout
   const router = Router();
 
   router.post('/scheduler/interests-reminder', async (_req: Request, res: Response) => {
+    const questionSet = await deps.weeklyQuestionSetRepository.get();
+    if (!questionSet || questionSet.status === 'paused') {
+      res.json({ remindedCount: 0 });
+      return;
+    }
+    const questions = questionSet.questions;
+
     const employees = await deps.employeeRepository.listActive();
     const incomplete = employees.filter(
       (e): e is EmployeeProfile & { chatSpaceName: string } =>
-        !!e.chatSpaceName && findNextQuestion(e.interestTags) !== undefined,
+        !!e.chatSpaceName && findNextQuestion(questions, e.interestAnswers) !== undefined,
     );
 
     let remindedCount = 0;

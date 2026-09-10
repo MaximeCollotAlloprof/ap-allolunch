@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import type { EmployeeId, EmployeeProfile } from '../../src/domain/types.js';
+import type { EmployeeId, EmployeeProfile, WeeklyQuestionSet } from '../../src/domain/types.js';
 import type { EmployeeRepository } from '../../src/db/repositories/employeeRepository.js';
+import type { WeeklyQuestionSetRepository } from '../../src/db/repositories/weeklyQuestionSetRepository.js';
+import { buildAnswerId } from '../../src/chat/interestsQuestionnaire.js';
 import { createChatWebhookRouter } from '../../src/chat/webhook.js';
+import { TEST_QUESTION_SET } from '../fixtures/weeklyQuestions.js';
 
 function createInMemoryEmployeeRepository(): EmployeeRepository {
   const store = new Map<EmployeeId, EmployeeProfile>();
@@ -11,6 +14,7 @@ function createInMemoryEmployeeRepository(): EmployeeRepository {
     findById: (id) => Promise.resolve(store.get(id)),
     listActive: () =>
       Promise.resolve([...store.values()].filter((profile) => profile.status === 'active')),
+    listAll: () => Promise.resolve([...store.values()]),
     upsert: (profile) => {
       store.set(profile.id, profile);
       return Promise.resolve();
@@ -23,14 +27,32 @@ function createInMemoryEmployeeRepository(): EmployeeRepository {
   };
 }
 
+function createInMemoryWeeklyQuestionSetRepository(
+  initial: WeeklyQuestionSet | undefined = TEST_QUESTION_SET,
+): WeeklyQuestionSetRepository {
+  let current = initial;
+  return {
+    get: () => Promise.resolve(current),
+    set: (questionSet) => {
+      current = questionSet;
+      return Promise.resolve();
+    },
+  };
+}
+
 // Par defaut, toujours choisir le premier candidat (comportement deterministe et
-// coherent avec l'ordre de INTEREST_QUESTIONS) - un test dedie verifie la randomisation.
-function createApp(employeeRepository: EmployeeRepository, random: () => number = () => 0) {
+// coherent avec l'ordre de TEST_QUESTIONS) - un test dedie verifie la randomisation.
+function createApp(
+  employeeRepository: EmployeeRepository,
+  random: () => number = () => 0,
+  weeklyQuestionSetRepository: WeeklyQuestionSetRepository = createInMemoryWeeklyQuestionSetRepository(),
+) {
   const app = express();
   app.use(express.json());
   app.use(
     createChatWebhookRouter({
       employeeRepository,
+      weeklyQuestionSetRepository,
       chatWebhookUrl: 'https://example.com/chat/webhook',
       verifyBearerToken: () => Promise.resolve(true),
       random,
@@ -77,6 +99,15 @@ async function sendMessage(
   return extractResult(res);
 }
 
+/** /rejoindre + reponse aux disponibilites, pour arriver a un profil actif standard. */
+async function joinAndSetAvailability(
+  app: express.Express,
+  email = 'alice@example.com',
+): Promise<void> {
+  await sendMessage(app, '/rejoindre', email);
+  await sendMessage(app, 'lundi,mardi', email);
+}
+
 describe('chat webhook', () => {
   it('refuse les requetes non authentifiees par Google Chat', async () => {
     const app = express();
@@ -84,6 +115,7 @@ describe('chat webhook', () => {
     app.use(
       createChatWebhookRouter({
         employeeRepository: createInMemoryEmployeeRepository(),
+        weeklyQuestionSetRepository: createInMemoryWeeklyQuestionSetRepository(),
         chatWebhookUrl: 'https://example.com/chat/webhook',
         verifyBearerToken: () => Promise.resolve(false),
       }),
@@ -95,15 +127,49 @@ describe('chat webhook', () => {
     expect(res.status).toBe(401);
   });
 
-  it('/rejoindre cree un profil actif', async () => {
+  it('/rejoindre demande les disponibilites de la semaine avant toute question', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
     const res = await sendMessage(app, '/rejoindre');
     expect(res.text).toMatch(/Bienvenue/);
+    expect(res.text).toMatch(/disponible/i);
 
     const profile = await repo.findById('alice@example.com');
     expect(profile?.status).toBe('active');
+    expect(profile?.awaitingAvailability).toBe(true);
+  });
+
+  it('/rejoindre refuse de participer quand AlloLunch est en pause cette semaine', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const pausedQuestionSet: WeeklyQuestionSet = { ...TEST_QUESTION_SET, status: 'paused' };
+    const app = createApp(
+      repo,
+      () => 0,
+      createInMemoryWeeklyQuestionSetRepository(pausedQuestionSet),
+    );
+
+    const res = await sendMessage(app, '/rejoindre');
+    expect(res.text).toMatch(/pause/i);
+
+    const profile = await repo.findById('alice@example.com');
+    expect(profile).toBeUndefined();
+  });
+
+  it('repondre aux disponibilites enchaine immediatement sur la premiere question', async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    const res = await sendMessage(app, 'lundi,mardi');
+
+    expect(res.text).toMatch(/Disponibilites enregistrees: lundi, mardi/);
+    expect(res.text).toMatch(/cuisine/i);
+
+    const profile = await repo.findById('alice@example.com');
+    expect(profile?.availableDays).toEqual(['lundi', 'mardi']);
+    expect(profile?.awaitingAvailability).toBe(false);
+    expect(profile?.interestsQuestionnaireActive).toBe(true);
   });
 
   it('/pause sans profil existant renvoie un message explicite', async () => {
@@ -116,7 +182,7 @@ describe('chat webhook', () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     await sendMessage(app, '/pause');
 
     const profile = await repo.findById('alice@example.com');
@@ -127,7 +193,7 @@ describe('chat webhook', () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     const res = await sendMessage(app, '/interets');
 
     expect(res.text).toMatch(/cuisine/i);
@@ -141,24 +207,24 @@ describe('chat webhook', () => {
     // random proche de 1: pointe vers le dernier candidat (entrepreneuriat, 12e categorie).
     const app = createApp(repo, () => 0.999);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     const res = await sendMessage(app, '/interets');
 
     expect(res.text).toMatch(/entrepreneuriat/i);
   });
 
-  it('une reponse valide (numero) enregistre le tag et enchaine sur la question suivante', async () => {
+  it('une reponse valide (numero) enregistre la reponse et enchaine sur la question suivante', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
     const res = await sendMessage(app, '1');
 
     expect(res.text).toMatch(/Enregistre : Italienne/);
     expect(res.text).toMatch(/sport/i);
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestTags).toEqual(['cuisine', 'cuisine-italienne']);
+    expect(profile?.interestAnswers).toEqual([buildAnswerId('cuisine', '1')]);
     expect(profile?.interestsQuestionnaireActive).toBe(true);
   });
 
@@ -166,28 +232,28 @@ describe('chat webhook', () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
     const res = await sendMessage(app, '99');
 
     expect(res.text).toMatch(/Reponse invalide/);
     expect(res.text).toMatch(/cuisine/i);
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestTags).toEqual([]);
+    expect(profile?.interestAnswers).toEqual([]);
   });
 
   it('repondre 0 passe la question suivante sans enregistrer de reponse', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
     const res = await sendMessage(app, '0');
 
     expect(res.text).toMatch(/Question passee/);
     expect(res.text).toMatch(/sport/i);
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestTags).toEqual([]);
+    expect(profile?.interestAnswers).toEqual([]);
     expect(profile?.interestsSkippedCategories).toEqual(['cuisine']);
   });
 
@@ -195,7 +261,7 @@ describe('chat webhook', () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
     await sendMessage(app, '1'); // repond cuisine, avance sur sport
     await sendMessage(app, '0'); // passe sport
@@ -208,7 +274,7 @@ describe('chat webhook', () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
     await sendMessage(app, '0'); // passe cuisine
 
@@ -223,16 +289,20 @@ describe('chat webhook', () => {
     const res = await sendMessage(app, '1'); // repond enfin cuisine -> Italienne
     expect(res.text).toMatch(/complet/);
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestTags).toContain('cuisine-italienne');
+    expect(profile?.interestAnswers).toContain(buildAnswerId('cuisine', '1'));
   });
 
   it('un numero envoye sans questionnaire actif tombe sur la commande inconnue', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
-    const res = await sendMessage(app, '2');
+    await joinAndSetAvailability(app);
+    // Termine le questionnaire pour que plus rien n'attende de reponse.
+    for (let i = 0; i < 12; i++) {
+      await sendMessage(app, '1');
+    }
 
+    const res = await sendMessage(app, '2');
     expect(res.text).toMatch(/Commande inconnue/);
   });
 
@@ -240,7 +310,7 @@ describe('chat webhook', () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
 
     let last = { status: 200, text: '' };
@@ -251,7 +321,7 @@ describe('chat webhook', () => {
     expect(last.text).toMatch(/complet/);
     const profile = await repo.findById('alice@example.com');
     expect(profile?.interestsQuestionnaireActive).toBe(false);
-    expect(profile?.interestTags).toHaveLength(24); // 12 categories + 12 tags specifiques
+    expect(profile?.interestAnswers).toHaveLength(12); // une reponse par categorie
 
     const res = await sendMessage(app, '/interets');
     expect(res.text).toMatch(/deja complet/);
@@ -261,7 +331,7 @@ describe('chat webhook', () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     const res = await sendMessage(app, '/disponibilites lundi,jeudi');
 
     expect(res.text).toMatch(/lundi, jeudi/);
@@ -269,17 +339,16 @@ describe('chat webhook', () => {
     expect(profile?.availableDays).toEqual(['lundi', 'jeudi']);
   });
 
-  it('/profil affiche le libelle specifique sans repeter la categorie large', async () => {
+  it('/profil affiche le libelle de la reponse choisie', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
     await sendMessage(app, '1'); // cuisine -> Italienne
     const res = await sendMessage(app, '/profil');
 
     expect(res.text).toMatch(/Italienne/);
-    expect(res.text).not.toMatch(/cuisine/i);
     expect(res.text).toMatch(/actif/);
   });
 
@@ -287,7 +356,7 @@ describe('chat webhook', () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
     await sendMessage(app, '1'); // cuisine -> Italienne
     const res = await sendMessage(app, '/interets modifier');
@@ -300,7 +369,7 @@ describe('chat webhook', () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     const res = await sendMessage(app, '/interets modifier');
 
     expect(res.text).toMatch(/pas encore repondu/);
@@ -310,7 +379,7 @@ describe('chat webhook', () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
     await sendMessage(app, '1'); // cuisine -> Italienne
 
@@ -322,7 +391,7 @@ describe('chat webhook', () => {
     expect(res.text).toMatch(/Mis a jour: Cuisine: Asiatique/);
 
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestTags).toEqual(['cuisine', 'cuisine-asiatique']);
+    expect(profile?.interestAnswers).toEqual([buildAnswerId('cuisine', '2')]);
     expect(profile?.interestsEditingCategory).toBeUndefined();
   });
 
@@ -330,7 +399,7 @@ describe('chat webhook', () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
     await sendMessage(app, '1'); // cuisine -> Italienne
     await sendMessage(app, '/interets modifier 1');
@@ -339,14 +408,14 @@ describe('chat webhook', () => {
     expect(res.text).toMatch(/annulee/);
 
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestTags).toEqual(['cuisine', 'cuisine-italienne']);
+    expect(profile?.interestAnswers).toEqual([buildAnswerId('cuisine', '1')]);
   });
 
   it('/interets supprimer <numero> efface la reponse sans passer par une conversation', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
     await sendMessage(app, '1'); // cuisine -> Italienne
     await sendMessage(app, '1'); // sport -> Hockey
@@ -355,14 +424,14 @@ describe('chat webhook', () => {
     expect(res.text).toMatch(/Reponse supprimee pour Cuisine/);
 
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestTags).toEqual(['sport', 'sport-hockey']);
+    expect(profile?.interestAnswers).toEqual([buildAnswerId('sport', '1')]);
   });
 
   it('/interets modifier <numero invalide> renvoie une erreur explicite', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
-    await sendMessage(app, '/rejoindre');
+    await joinAndSetAvailability(app);
     const res = await sendMessage(app, '/interets modifier 99');
     expect(res.text).toMatch(/Numero invalide/);
   });

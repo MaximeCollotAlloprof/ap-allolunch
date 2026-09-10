@@ -6,13 +6,17 @@ import type {
   EmployeeProfile,
   MatchCycle,
   MatchGroup,
+  WeeklyQuestionSet,
 } from '../../src/domain/types.js';
 import type { EmployeeRepository } from '../../src/db/repositories/employeeRepository.js';
 import type { MatchHistoryRepository } from '../../src/db/repositories/matchHistoryRepository.js';
 import type { MatchCycleRepository } from '../../src/db/repositories/matchCycleRepository.js';
+import type { WeeklyQuestionSetRepository } from '../../src/db/repositories/weeklyQuestionSetRepository.js';
 import type { CalendarService, CreateLunchEventInput } from '../../src/calendar/calendarService.js';
 import type { ChatNotifier } from '../../src/chat/chatNotifier.js';
+import { buildAnswerId } from '../../src/chat/interestsQuestionnaire.js';
 import { createTriggerCycleRouter } from '../../src/scheduler/triggerCycle.js';
+import { TEST_QUESTION_SET } from '../fixtures/weeklyQuestions.js';
 
 interface TriggerCycleResponse {
   status: number;
@@ -35,9 +39,10 @@ function employee(overrides: Partial<EmployeeProfile> & { id: EmployeeId }): Emp
   return {
     displayName: overrides.id,
     status: 'active',
-    interestTags: [],
+    interestAnswers: [],
     availableDays: [],
     interestsQuestionnaireActive: false,
+    awaitingAvailability: false,
     createdAt: now,
     updatedAt: now,
     ...overrides,
@@ -48,6 +53,7 @@ function createEmployeeRepository(employees: EmployeeProfile[]): EmployeeReposit
   return {
     findById: (id) => Promise.resolve(employees.find((e) => e.id === id)),
     listActive: () => Promise.resolve(employees.filter((e) => e.status === 'active')),
+    listAll: () => Promise.resolve(employees),
     upsert: () => Promise.resolve(),
     setStatus: () => Promise.resolve(),
   };
@@ -78,10 +84,20 @@ function createMatchCycleRepository(savedCycles: MatchCycle[]): MatchCycleReposi
   };
 }
 
+function createWeeklyQuestionSetRepository(
+  questionSet: WeeklyQuestionSet | undefined = TEST_QUESTION_SET,
+): WeeklyQuestionSetRepository {
+  return {
+    get: () => Promise.resolve(questionSet),
+    set: () => Promise.resolve(),
+  };
+}
+
 function createApp(deps: {
   employees: EmployeeProfile[];
   calendarService: CalendarService;
   chatNotifier: ChatNotifier;
+  weeklyQuestionSetRepository?: WeeklyQuestionSetRepository;
 }) {
   const savedGroups: MatchGroup[] = [];
   const savedCycles: MatchCycle[] = [];
@@ -92,6 +108,8 @@ function createApp(deps: {
       employeeRepository: createEmployeeRepository(deps.employees),
       matchHistoryRepository: createMatchHistoryRepository(savedGroups),
       matchCycleRepository: createMatchCycleRepository(savedCycles),
+      weeklyQuestionSetRepository:
+        deps.weeklyQuestionSetRepository ?? createWeeklyQuestionSetRepository(),
       matchHistoryWindowCycles: 4,
       calendarService: deps.calendarService,
       chatNotifier: deps.chatNotifier,
@@ -106,16 +124,16 @@ describe('trigger-cycle', () => {
       id: 'alice@example.com',
       displayName: 'Alice',
       availableDays: ['mardi', 'jeudi'],
-      // meme reponse (musique-rock): doit apparaitre. Sport: reponses differentes
-      // (soccer vs raquette), meme categorie large - ne doit PAS apparaitre.
-      interestTags: ['musique', 'musique-rock', 'sport', 'sport-soccer'],
+      // meme reponse (musique:1 = Rock): doit apparaitre. Sport: reponses differentes,
+      // meme categorie - ne doit PAS apparaitre.
+      interestAnswers: [buildAnswerId('musique', '1'), buildAnswerId('sport', '2')],
       chatSpaceName: 'spaces/alice',
     });
     const bob = employee({
       id: 'bob@example.com',
       displayName: 'Bob',
       availableDays: ['jeudi'],
-      interestTags: ['musique', 'musique-rock', 'sport', 'sport-raquette'],
+      interestAnswers: [buildAnswerId('musique', '1'), buildAnswerId('sport', '3')],
       chatSpaceName: 'spaces/bob',
     });
 
@@ -150,7 +168,7 @@ describe('trigger-cycle', () => {
       'spaces/alice',
       expect.stringContaining('Musique: Rock'),
     );
-    // Sport: reponses differentes (soccer vs raquette) - pas un point commun.
+    // Sport: reponses differentes - pas un point commun.
     expect(sendDirectMessage).toHaveBeenCalledWith(
       'spaces/alice',
       expect.not.stringContaining('Sport'),
@@ -164,13 +182,13 @@ describe('trigger-cycle', () => {
     const alice = employee({
       id: 'alice@example.com',
       availableDays: ['lundi'],
-      interestTags: ['musique'],
+      interestAnswers: [buildAnswerId('musique', '1')],
       chatSpaceName: 'spaces/alice',
     });
     const bob = employee({
       id: 'bob@example.com',
       availableDays: ['lundi'],
-      interestTags: ['sport'],
+      interestAnswers: [buildAnswerId('sport', '1')],
       chatSpaceName: 'spaces/bob',
     });
 
@@ -280,5 +298,42 @@ describe('trigger-cycle', () => {
     expect(savedGroups).toHaveLength(1);
     expect(savedGroups[0]?.calendarEventId).toBeUndefined();
     expect(savedCycles[0]?.status).toBe('completed');
+  });
+
+  it('ne matche personne et ne cree aucun cycle quand la semaine est en pause', async () => {
+    const alice = employee({
+      id: 'alice@example.com',
+      availableDays: ['lundi'],
+      chatSpaceName: 'spaces/alice',
+    });
+    const bob = employee({
+      id: 'bob@example.com',
+      availableDays: ['lundi'],
+      chatSpaceName: 'spaces/bob',
+    });
+
+    const createLunchEvent = createMockCalendarService(() =>
+      Promise.resolve({ eventId: 'evt-123' }),
+    );
+    const sendDirectMessage = vi.fn(() => Promise.resolve());
+
+    const { app, savedGroups, savedCycles } = createApp({
+      employees: [alice, bob],
+      calendarService: { createLunchEvent },
+      chatNotifier: { sendDirectMessage },
+      weeklyQuestionSetRepository: createWeeklyQuestionSetRepository({
+        ...TEST_QUESTION_SET,
+        status: 'paused',
+      }),
+    });
+
+    const res = await triggerCycle(app);
+
+    expect(res.status).toBe(200);
+    expect(res.body.groupCount).toBe(0);
+    expect(createLunchEvent).not.toHaveBeenCalled();
+    expect(sendDirectMessage).not.toHaveBeenCalled();
+    expect(savedGroups).toHaveLength(0);
+    expect(savedCycles).toHaveLength(0);
   });
 });

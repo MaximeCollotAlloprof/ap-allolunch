@@ -39,4 +39,14 @@ describe('nextDateForDayOfWeek', () => {
     const result = nextDateForDayOfWeek('lundi', friday);
     expect(result.toISOString().slice(0, 10)).toBe('2026-09-21');
   });
+
+  it('appele un vendredi avec "vendredi" tombe sur le vendredi de la semaine suivante (pas le meme jour)', () => {
+    // Cas du cycle hebdomadaire: le matching tourne vendredi 9h pour la semaine
+    // demandee le lundi precedent - si le jour commun est justement "vendredi", il ne
+    // doit jamais tomber sur le vendredi en cours (deja passe/inutile), mais sur celui
+    // de la semaine visee (7 jours plus tard).
+    const friday = new Date('2026-09-18T09:00:00'); // vendredi, meme jour que le matching
+    const result = nextDateForDayOfWeek('vendredi', friday);
+    expect(result.toISOString().slice(0, 10)).toBe('2026-09-25');
+  });
 });

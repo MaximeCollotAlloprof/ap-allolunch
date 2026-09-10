@@ -1,8 +1,9 @@
-import type { EmployeeId, InterestTag } from '../domain/types.js';
+import type { EmployeeId } from '../domain/types.js';
 
 export interface MatchingCandidate {
   employeeId: EmployeeId;
-  interestTags: InterestTag[];
+  /** `${category}:${optionId}` - voir EmployeeProfile.interestAnswers. */
+  interestAnswers: string[];
 }
 
 export interface FormMatchGroupsOptions {
@@ -111,7 +112,7 @@ function pickBestCompatibleIndex(
     if (!candidate || hasRecentPairConflict(candidate.employeeId, group, recentPairs)) continue;
 
     const score = group.reduce(
-      (acc, member) => acc + sharedInterestScore(member.interestTags, candidate.interestTags),
+      (acc, member) => acc + sharedInterestScore(member.interestAnswers, candidate.interestAnswers),
       0,
     );
     if (score > bestScore) {
@@ -152,7 +153,7 @@ function hasRecentPairConflict(
   return group.some((member) => recentPairs.has(buildPairKey(member.employeeId, candidateId)));
 }
 
-function sharedInterestScore(a: InterestTag[], b: InterestTag[]): number {
+function sharedInterestScore(a: string[], b: string[]): number {
   const setB = new Set(b);
   return a.filter((tag) => setB.has(tag)).length;
 }

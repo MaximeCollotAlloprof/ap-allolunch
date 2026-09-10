@@ -5,8 +5,11 @@ import {
   type MatchingCandidate,
 } from '../../src/matching/engine.js';
 
-function candidate(id: string, tags: MatchingCandidate['interestTags'] = []): MatchingCandidate {
-  return { employeeId: id, interestTags: tags };
+function candidate(
+  id: string,
+  answers: MatchingCandidate['interestAnswers'] = [],
+): MatchingCandidate {
+  return { employeeId: id, interestAnswers: answers };
 }
 
 // RNG deterministe pour des tests reproductibles (evite le vrai Math.random).

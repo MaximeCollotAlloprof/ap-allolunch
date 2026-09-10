@@ -11,7 +11,8 @@ interfaces deja definies dans le scaffold (`ChatCommandHandler`, `CalendarServic
       confirmer qu'elles viennent bien de Google Chat, avant tout traitement.
 - [x] Implementer `/rejoindre` - cree/active le profil de l'employe (opt-in).
 - [x] Implementer `/pause` - passe le statut de l'employe a `paused`.
-- [x] Implementer `/interets` - flow conversationnel pour choisir des tags parmi `InterestTag`.
+- [x] Implementer `/interets` - flow conversationnel pour repondre aux questions
+      generees par Gemini pour la semaine en cours (voir lot 4).
 - [x] `/interets modifier [numero]` et `/interets supprimer <numero>` - changer ou effacer
       une reponse deja donnee, sans repasser par tout le questionnaire.
 - [x] Implementer `/disponibilites` - saisie des jours disponibles (`DayOfWeek`).
@@ -51,18 +52,40 @@ interfaces deja definies dans le scaffold (`ChatCommandHandler`, `CalendarServic
       en impersonnant l'organisateur via le service account.
 - [x] Determiner le creneau propose a partir des `availableDays` communs du groupe (regle
       simple pour le MVP, ex: premier jour disponible chez tous).
-- [ ] Provisionner le projet GCP: Cloud Run, Cloud Scheduler (cron hebdomadaire ->
-      `POST /scheduler/trigger-cycle`), Secret Manager, Firestore.
+- [ ] Provisionner le projet GCP: Cloud Run, **deux** jobs Cloud Scheduler (fuseau horaire
+      explicite, ex: America/Toronto) - lundi matin -> `POST /scheduler/weekly-reset`,
+      vendredi 9h -> `POST /scheduler/trigger-cycle` -, Secret Manager, Firestore.
 - [ ] Verifier l'en-tete OIDC injecte par Cloud Scheduler sur `/scheduler/trigger-cycle`
-      pour s'assurer que seul Cloud Scheduler peut declencher un cycle.
+      et `/scheduler/weekly-reset` pour s'assurer que seul Cloud Scheduler peut les declencher.
 - [ ] Pipeline de build/push de l'image Docker + deploiement Cloud Run (GitHub Actions,
       a ajouter en complement de `ci.yml`).
 - [ ] Definir les environnements (dev/staging/prod) et leurs projets GCP respectifs.
 - [ ] Documenter la procedure d'obtention/rotation des credentials dans le README.
+- [ ] Obtenir une cle API Gemini (Google AI Studio) et la stocker en Secret Manager -
+      voir lot 4.
+
+## Lot 4 - Cycle hebdomadaire IA (`src/ai/`, `src/scheduler/weeklyReset.ts`)
+
+- [x] `POST /scheduler/weekly-reset`: genere les 12 questions de la semaine via l'API
+      Gemini (`src/ai/geminiQuestionGenerator.ts`, sortie validee par un schema `zod`),
+      remet a zero les profils (centres d'interet, disponibilites, statut -> `paused`) de
+      tous les employes connus, et diffuse un message d'annonce.
+- [x] Si Gemini echoue ou renvoie un format invalide: aucun fallback automatique - le
+      `WeeklyQuestionSet` passe en `status: 'paused'`, aucun profil n'est touche, et
+      `/scheduler/trigger-cycle` du vendredi suivant ne matche personne cette semaine-la.
+- [x] `/rejoindre` devient une action hebdomadaire obligatoire: refuse si la semaine est
+      en pause, sinon redemande toujours les disponibilites en premier (avant les
+      questions) si elles sont vides pour la semaine en cours.
+- [x] `EmployeeProfile.interestAnswers: string[]` (format `${category}:${optionId}`)
+      remplace l'ancien `interestTags: InterestTag[]` statique - le questionnaire
+      (`src/chat/interestsQuestionnaire.ts`) est desormais pilote par le
+      `WeeklyQuestionSet` courant plutot qu'un tableau fixe.
+- [ ] Decider si `/scheduler/interests-reminder` (lot 1) reste pertinent tel quel avec
+      l'echeance fixe du vendredi 9h, ou doit changer de cadence/etre retire.
 
 ## Hors-scope MVP (V2 potentielle)
 
 - Tableau de bord admin (participation, taux de reponse, opt-outs).
-- Matching par similarite semantique (texte libre + embeddings) plutot que tags predefinis.
 - Support multilingue (anglais).
 - Lecture du free/busy Google Calendar pour proposer des creneaux automatiquement.
+- Historique des jeux de questions hebdomadaires (un seul document "courant" pour le MVP).
