@@ -6,18 +6,18 @@ interfaces deja definies dans le scaffold (`ChatCommandHandler`, `CalendarServic
 
 ## Lot 1 - Bot Google Chat + questionnaire (`src/chat/`)
 
-- [ ] Enregistrer l'app Google Chat dans la console GCP (nom, avatar, description).
-- [ ] Verifier l'en-tete Bearer des requetes entrantes (`req.headers.authorization`) pour
+- [x] Enregistrer l'app Google Chat dans la console GCP (nom, avatar, description).
+- [x] Verifier l'en-tete Bearer des requetes entrantes (`req.headers.authorization`) pour
       confirmer qu'elles viennent bien de Google Chat, avant tout traitement.
-- [ ] Implementer `/rejoindre` - cree/active le profil de l'employe (opt-in).
-- [ ] Implementer `/pause` - passe le statut de l'employe a `paused`.
-- [ ] Implementer `/interets` - flow conversationnel pour choisir des tags parmi `InterestTag`.
-- [ ] Implementer `/disponibilites` - saisie des jours disponibles (`DayOfWeek`).
-- [ ] Implementer `/profil` - affiche le profil courant de l'employe.
+- [x] Implementer `/rejoindre` - cree/active le profil de l'employe (opt-in).
+- [x] Implementer `/pause` - passe le statut de l'employe a `paused`.
+- [x] Implementer `/interets` - flow conversationnel pour choisir des tags parmi `InterestTag`.
+- [x] Implementer `/disponibilites` - saisie des jours disponibles (`DayOfWeek`).
+- [x] Implementer `/profil` - affiche le profil courant de l'employe.
 - [ ] Message de notification envoye a chaque membre d'un groupe quand un match est cree
       (declenche depuis `scheduler/triggerCycle.ts`, a brancher).
 - [ ] Rappel automatique si un match ne repond pas apres X jours (pas de penalite, cf. CLAUDE.md).
-- [ ] Gerer le cas de la commande inconnue (`/aide` listant les commandes disponibles).
+- [x] Gerer le cas de la commande inconnue (`/aide` listant les commandes disponibles).
 
 ## Lot 2 - Moteur de matching + Firestore (`src/matching/`, `src/db/`)
 

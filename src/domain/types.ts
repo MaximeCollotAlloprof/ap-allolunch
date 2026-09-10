@@ -1,6 +1,13 @@
 export type EmployeeId = string;
 
+/**
+ * Liste fermee des centres d'interet. Chaque categorie "large" (ex: `musique`) a des
+ * tags "specifiques" associes (ex: `musique-rock`) proposes via le questionnaire
+ * /interets - voir src/chat/interestsQuestionnaire.ts pour les questions/reponses et
+ * l'association categorie -> tags specifiques.
+ */
 export type InterestTag =
+  // Categories larges
   | 'cuisine'
   | 'sport'
   | 'voyage'
@@ -12,7 +19,88 @@ export type InterestTag =
   | 'plein-air'
   | 'art-creatif'
   | 'famille-enfants'
-  | 'entrepreneuriat';
+  | 'entrepreneuriat'
+  // cuisine
+  | 'cuisine-italienne'
+  | 'cuisine-asiatique'
+  | 'cuisine-mexicaine'
+  | 'cuisine-vegetarienne'
+  | 'cuisine-quebecoise'
+  | 'cuisine-street-food'
+  // sport
+  | 'sport-hockey'
+  | 'sport-soccer'
+  | 'sport-course'
+  | 'sport-musculation'
+  | 'sport-raquette'
+  | 'sport-aquatique'
+  // voyage
+  | 'voyage-plage'
+  | 'voyage-aventure'
+  | 'voyage-grandes-villes'
+  | 'voyage-road-trip'
+  | 'voyage-sac-a-dos'
+  | 'voyage-tout-inclus'
+  // technologie
+  | 'technologie-ia'
+  | 'technologie-developpement'
+  | 'technologie-gadgets'
+  | 'technologie-cybersecurite'
+  | 'technologie-jeux-high-tech'
+  // jeux-video
+  | 'jeux-video-action-aventure'
+  | 'jeux-video-strategie'
+  | 'jeux-video-rpg'
+  | 'jeux-video-sport-course'
+  | 'jeux-video-multijoueur'
+  | 'jeux-video-mobile'
+  // lecture
+  | 'lecture-romans'
+  | 'lecture-essais'
+  | 'lecture-science-fiction'
+  | 'lecture-polar'
+  | 'lecture-bd'
+  | 'lecture-developpement-personnel'
+  // musique
+  | 'musique-rock'
+  | 'musique-pop'
+  | 'musique-rap'
+  | 'musique-electro'
+  | 'musique-jazz'
+  | 'musique-classique'
+  // cinema
+  | 'cinema-action'
+  | 'cinema-comedie'
+  | 'cinema-drame'
+  | 'cinema-horreur'
+  | 'cinema-science-fiction'
+  | 'cinema-documentaire'
+  // plein-air
+  | 'plein-air-randonnee'
+  | 'plein-air-velo'
+  | 'plein-air-camping'
+  | 'plein-air-sports-hiver'
+  | 'plein-air-jardinage'
+  | 'plein-air-peche-chasse'
+  // art-creatif
+  | 'art-creatif-dessin'
+  | 'art-creatif-photographie'
+  | 'art-creatif-instrument'
+  | 'art-creatif-ecriture'
+  | 'art-creatif-artisanat'
+  | 'art-creatif-danse'
+  // famille-enfants
+  | 'famille-enfants-jeunes-enfants'
+  | 'famille-enfants-ados'
+  | 'famille-enfants-futur-parent'
+  | 'famille-enfants-activites-familiales'
+  | 'famille-enfants-sans-enfants'
+  // entrepreneuriat
+  | 'entrepreneuriat-startup'
+  | 'entrepreneuriat-investissement'
+  | 'entrepreneuriat-freelance'
+  | 'entrepreneuriat-leadership'
+  | 'entrepreneuriat-innovation';
 
 export type EmployeeStatus = 'active' | 'paused';
 
@@ -24,6 +112,13 @@ export interface EmployeeProfile {
   status: EmployeeStatus;
   interestTags: InterestTag[];
   availableDays: DayOfWeek[];
+  /**
+   * true entre deux messages tant que l'employe est au milieu du questionnaire
+   * /interets (voir src/chat/interestsQuestionnaire.ts) - permet d'interpreter un
+   * message texte brut (ex: "2") comme une reponse plutot que comme une commande
+   * inconnue, et de reprendre le questionnaire a la bonne question plus tard.
+   */
+  interestsQuestionnaireActive: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

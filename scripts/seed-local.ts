@@ -8,7 +8,10 @@ import type { EmployeeProfile } from '../src/domain/types.js';
  * declencher un cycle de matching complet sans tout saisir a la main dans l'UI.
  * Usage: npm run emulator (terminal 1), puis npm run seed:local (terminal 2).
  */
-const sampleEmployees: Omit<EmployeeProfile, 'createdAt' | 'updatedAt'>[] = [
+const sampleEmployees: Omit<
+  EmployeeProfile,
+  'createdAt' | 'updatedAt' | 'interestsQuestionnaireActive'
+>[] = [
   {
     id: 'alice@alloprof.qc.ca',
     displayName: 'Alice',
@@ -59,7 +62,12 @@ async function main(): Promise<void> {
   const now = new Date();
 
   for (const employee of sampleEmployees) {
-    await repository.upsert({ ...employee, createdAt: now, updatedAt: now });
+    await repository.upsert({
+      ...employee,
+      interestsQuestionnaireActive: false,
+      createdAt: now,
+      updatedAt: now,
+    });
   }
 
   console.log(`${sampleEmployees.length} employes de test ajoutes a l'emulateur (${projectId}).`);
