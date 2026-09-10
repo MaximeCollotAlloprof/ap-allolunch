@@ -17,6 +17,10 @@ interfaces deja definies dans le scaffold (`ChatCommandHandler`, `CalendarServic
 - [x] Message de notification envoye a chaque membre d'un groupe quand un match est cree
       (declenche depuis `scheduler/triggerCycle.ts`, a brancher).
 - [ ] Rappel automatique si un match ne repond pas apres X jours (pas de penalite, cf. CLAUDE.md).
+- [x] Rappel periodique pour completer le questionnaire /interets: nouvel endpoint
+      `POST /scheduler/interests-reminder` (`src/scheduler/interestsReminder.ts`), a
+      brancher sur un Cloud Scheduler separe (cadence a definir, ex: hebdomadaire) - voir
+      lot 3 pour le provisionnement.
 - [x] Gerer le cas de la commande inconnue (`/aide` listant les commandes disponibles).
 
 ## Lot 2 - Moteur de matching + Firestore (`src/matching/`, `src/db/`)
