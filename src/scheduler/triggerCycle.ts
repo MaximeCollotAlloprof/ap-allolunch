@@ -34,7 +34,7 @@ function formatMatchNotification(
     sharedAnswers.length > 0
       ? `\nVous avez en commun:\n${sharedAnswers.map((a) => `${a.categoryLabel}: ${a.answerLabel}`).join('\n')}`
       : '';
-  return `Tu as ete matche pour un diner AlloLunch avec ${names} !${sharedText}\n${dateText}`;
+  return `It's a match! Tu as un rendez-vous pour un diner AlloLunch avec ${names} !${sharedText}\n${dateText}`;
 }
 
 /**
