@@ -43,7 +43,7 @@ export function createGeminiQuestionGenerator(apiKey: string): GeminiQuestionGen
   return {
     async generateWeeklyQuestions(categories) {
       const response = await client.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-3.6-flash',
         contents: [
           {
             role: 'user',

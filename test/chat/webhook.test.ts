@@ -172,6 +172,30 @@ describe('chat webhook', () => {
     expect(profile?.interestsQuestionnaireActive).toBe(true);
   });
 
+  it('enregistre la reponse pour la question reellement affichee, meme si le random varie entre les appels', async () => {
+    // Regression: findNextQuestion tire une question au hasard a CHAQUE appel. Si on
+    // recalcule "quelle question est en cours" en rappelant findNextQuestion au moment
+    // de repondre, un random qui varie peut retourner une toute autre categorie que
+    // celle vraiment affichee - la reponse serait alors enregistree au mauvais endroit.
+    // Le profil doit fixer la categorie affichee (interestsCurrentCategory) et la
+    // reutiliser telle quelle pour interpreter la reponse suivante.
+    const repo = createInMemoryEmployeeRepository();
+    const sequence = [0.2, 0]; // 1er appel -> voyage (index 2/12); 2e -> cuisine (index 0/12)
+    let call = 0;
+    const random = () => sequence[call++ % sequence.length]!;
+    const app = createApp(repo, random);
+
+    await sendMessage(app, '/rejoindre');
+    const shown = await sendMessage(app, 'lundi,mardi'); // consomme sequence[0] -> voyage
+    expect(shown.text).toMatch(/voyage/i);
+
+    const res = await sendMessage(app, '1'); // ne doit PAS consommer un nouveau random pour interpreter la reponse
+
+    expect(res.text).toMatch(/Enregistre : Plage et detente/);
+    const profile = await repo.findById('alice@example.com');
+    expect(profile?.interestAnswers).toEqual([buildAnswerId('voyage', '1')]);
+  });
+
   it('/pause sans profil existant renvoie un message explicite', async () => {
     const app = createApp(createInMemoryEmployeeRepository());
     const res = await sendMessage(app, '/pause');
@@ -339,7 +363,7 @@ describe('chat webhook', () => {
     expect(profile?.availableDays).toEqual(['lundi', 'jeudi']);
   });
 
-  it('/profil affiche le libelle de la reponse choisie', async () => {
+  it('/profil affiche chaque reponse en puce avec le libelle en gras', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
@@ -348,7 +372,7 @@ describe('chat webhook', () => {
     await sendMessage(app, '1'); // cuisine -> Italienne
     const res = await sendMessage(app, '/profil');
 
-    expect(res.text).toMatch(/Italienne/);
+    expect(res.text).toMatch(/- .*\*Italienne\*/);
     expect(res.text).toMatch(/actif/);
   });
 

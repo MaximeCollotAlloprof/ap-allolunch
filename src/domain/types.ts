@@ -104,6 +104,14 @@ export interface EmployeeProfile {
    */
   interestsEditingCategory?: InterestCategory;
   /**
+   * Categorie de la question actuellement affichee dans la progression sequentielle
+   * (/interets sans argument). Fixee au moment ou la question est montree et reutilisee
+   * pour interpreter la reponse suivante - necessaire car findNextQuestion tire au
+   * hasard parmi les questions en attente, donc un nouvel appel pourrait retourner une
+   * question differente de celle vraiment affichee a l'employe.
+   */
+  interestsCurrentCategory?: InterestCategory;
+  /**
    * Categories "passees" en repondant 0 a une question du questionnaire /interets -
    * reproposees seulement une fois toutes les autres questions sans reponse traitees.
    * Ne participe jamais au matching (contrairement a interestAnswers) - sert

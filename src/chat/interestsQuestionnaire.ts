@@ -131,19 +131,22 @@ export function formatEditPrompt(
   return `Modifier: ${question.categoryLabel}\n${currentLine}${question.prompt}\n${optionLines}\n0. Annuler`;
 }
 
-/** Pour l'affichage du profil: traduit chaque reponse en libelle lisible, dans l'ordre des questions. */
-export function getDisplayInterestLabels(
+export interface AnsweredQuestion {
+  prompt: string;
+  answerLabel: string;
+}
+
+/** Pour l'affichage du profil: la question posee et le libelle de la reponse choisie, dans l'ordre des questions. */
+export function getAnsweredQuestions(
   questions: readonly WeeklyQuestion[],
   interestAnswers: readonly string[],
-): string[] {
-  const answered = mapAnswersByCategory(interestAnswers);
-  const labels: string[] = [];
+): AnsweredQuestion[] {
+  const answered: AnsweredQuestion[] = [];
   for (const question of questions) {
-    const optionId = answered.get(question.category);
-    const option = optionId ? question.options.find((o) => o.id === optionId) : undefined;
-    if (option) labels.push(option.label);
+    const current = getCurrentAnswer(question, interestAnswers);
+    if (current) answered.push({ prompt: question.prompt, answerLabel: current.label });
   }
-  return labels;
+  return answered;
 }
 
 export interface SharedInterestAnswer {

@@ -4,14 +4,16 @@ import { logger } from '../logger.js';
 import type { EmployeeRepository } from '../db/repositories/employeeRepository.js';
 import type { WeeklyQuestionSetRepository } from '../db/repositories/weeklyQuestionSetRepository.js';
 import type { DayOfWeek, EmployeeProfile, WeeklyQuestion } from '../domain/types.js';
+import { nextDateForDayOfWeek } from '../calendar/scheduling.js';
 import { createGoogleChatTokenVerifier, type BearerTokenVerifier } from './auth.js';
 import {
+  buildAnswerId,
   findNextQuestion,
   formatEditPrompt,
   formatInterestsEditList,
   formatQuestionPrompt,
+  getAnsweredQuestions,
   getCurrentAnswer,
-  getDisplayInterestLabels,
   getQuestionByCategory,
   getQuestionByIndex,
   removeAnswerForCategory,
@@ -39,7 +41,17 @@ const NO_PROFILE_MESSAGE =
   "Tu n'as pas encore de profil AlloLunch. Tape /rejoindre pour commencer.";
 const PAUSED_WEEK_MESSAGE =
   'AlloLunch fait une pause cette semaine ! On se retrouve la semaine prochaine.';
-const AVAILABILITY_PROMPT = `Quels jours es-tu disponible cette semaine ? Reponds avec tes jours separes par des virgules parmi: ${DAYS_OF_WEEK.join(', ')}.\nEx: lundi,mercredi`;
+
+function getFirstName(displayName: string): string {
+  return displayName.trim().split(/\s+/)[0] ?? displayName;
+}
+
+/** Les disponibilites demandees couvrent la semaine SUIVANTE (le matching tourne le vendredi). */
+function formatAvailabilityPrompt(): string {
+  const nextMonday = nextDateForDayOfWeek('lundi', new Date());
+  const weekLabel = nextMonday.toLocaleDateString('fr-CA', { day: 'numeric', month: 'long' });
+  return `Quels jours seras-tu disponible la semaine prochaine (semaine du ${weekLabel}) ? Reponds avec tes jours separes par des virgules parmi: ${DAYS_OF_WEEK.join(', ')}.\nEx: lundi,mercredi`;
+}
 
 /**
  * Retire interestsEditingCategory du profil - Firestore rejette un champ explicitement
@@ -52,15 +64,26 @@ function withoutEditingCategory(profile: EmployeeProfile): EmployeeProfile {
   return next;
 }
 
+/** Meme raison que withoutEditingCategory, pour interestsCurrentCategory. */
+function withoutCurrentCategory(profile: EmployeeProfile): EmployeeProfile {
+  const next: EmployeeProfile = { ...profile };
+  delete next.interestsCurrentCategory;
+  return next;
+}
+
 function formatProfile(profile: EmployeeProfile, questions: readonly WeeklyQuestion[]): string {
-  const interestLabels = getDisplayInterestLabels(questions, profile.interestAnswers);
-  const interests = interestLabels.length > 0 ? interestLabels.join(', ') : 'aucun';
+  const answered = getAnsweredQuestions(questions, profile.interestAnswers);
+  const questionsText =
+    answered.length > 0
+      ? answered.map((a) => `- ${a.prompt} *${a.answerLabel}*`).join('\n')
+      : 'Aucune reponse pour le moment.';
   const days = profile.availableDays.length > 0 ? profile.availableDays.join(', ') : 'aucune';
   const status = profile.status === 'active' ? 'actif' : 'en pause';
   return [
     `Profil de ${profile.displayName}`,
     `Statut: ${status}`,
-    `Centres d'interet: ${interests}`,
+    'Questions:',
+    questionsText,
     `Disponibilites: ${days}`,
   ].join('\n');
 }
@@ -131,6 +154,7 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
 
       const now = new Date();
       const existing = await employeeRepository.findById(ctx.employeeId);
+      const firstName = getFirstName(ctx.displayName);
 
       const profile: EmployeeProfile = existing
         ? {
@@ -157,13 +181,13 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
       // disponibilites avant les questions - garanti d'etre la premiere chose demandee.
       if (profile.availableDays.length === 0) {
         await employeeRepository.upsert({ ...profile, awaitingAvailability: true });
-        return `Bienvenue ${ctx.displayName} ! ${AVAILABILITY_PROMPT}`;
+        return `Bienvenue ${firstName} ! ${formatAvailabilityPrompt()}`;
       }
 
       await employeeRepository.upsert(profile);
       return existing
-        ? `Bon retour ${ctx.displayName} ! Ton profil est de nouveau actif pour cette semaine.`
-        : `Bienvenue ${ctx.displayName} !`;
+        ? `Bon retour ${firstName} ! Ton profil est de nouveau actif pour cette semaine.`
+        : `Bienvenue ${firstName} !`;
     },
 
     '/pause': async (ctx) => {
@@ -227,32 +251,36 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
         return 'Argument non reconnu. Tape /interets, /interets modifier ou /interets supprimer <numero>.';
       }
 
-      // /interets sans argument: reprend le questionnaire sequentiel a la prochaine
-      // question sans reponse. Une modification en cours (/interets modifier <n>) est
-      // abandonnee pour eviter d'interpreter la prochaine reponse au mauvais endroit.
-      const nextQuestion = findNextQuestion(
-        questions,
-        profile.interestAnswers,
-        profile.interestsSkippedCategories ?? [],
-        random,
-      );
-      if (!nextQuestion) {
-        if (profile.interestsQuestionnaireActive || profile.interestsEditingCategory) {
-          await employeeRepository.upsert({
-            ...withoutEditingCategory(profile),
-            interestsQuestionnaireActive: false,
-            updatedAt: new Date(),
-          });
-        }
+      // /interets sans argument: reprend le questionnaire sequentiel. Reutilise la
+      // question deja affichee (interestsCurrentCategory) si elle n'a toujours pas de
+      // reponse, plutot que d'en tirer une autre au hasard - sinon la prochaine reponse
+      // pourrait s'appliquer a la mauvaise categorie. Une modification en cours
+      // (/interets modifier <n>) est abandonnee.
+      const skipped = profile.interestsSkippedCategories ?? [];
+      const pinned = profile.interestsCurrentCategory
+        ? getQuestionByCategory(questions, profile.interestsCurrentCategory)
+        : undefined;
+      const question =
+        pinned && !getCurrentAnswer(pinned, profile.interestAnswers)
+          ? pinned
+          : findNextQuestion(questions, profile.interestAnswers, skipped, random);
+
+      if (!question) {
+        await employeeRepository.upsert({
+          ...withoutEditingCategory(withoutCurrentCategory(profile)),
+          interestsQuestionnaireActive: false,
+          updatedAt: new Date(),
+        });
         return "Ton profil de centres d'interet est deja complet ! Tape /profil pour le voir.";
       }
 
       await employeeRepository.upsert({
         ...withoutEditingCategory(profile),
         interestsQuestionnaireActive: true,
+        interestsCurrentCategory: question.category,
         updatedAt: new Date(),
       });
-      return formatQuestionPrompt(nextQuestion);
+      return formatQuestionPrompt(question);
     },
 
     '/disponibilites': async (ctx) => {
@@ -294,7 +322,7 @@ async function handleAvailabilityAnswer(
 ): Promise<string> {
   const { values, invalid } = parseTaggedList(rawAnswer, DAYS_OF_WEEK);
   if (invalid.length > 0 || values.length === 0) {
-    return `Jour(s) invalide(s). ${AVAILABILITY_PROMPT}`;
+    return `Jour(s) invalide(s). ${formatAvailabilityPrompt()}`;
   }
 
   const questions = await getCurrentQuestions(weeklyQuestionSetRepository);
@@ -306,10 +334,11 @@ async function handleAvailabilityAnswer(
   );
 
   await employeeRepository.upsert({
-    ...profile,
+    ...withoutCurrentCategory(profile),
     availableDays: values,
     awaitingAvailability: false,
     interestsQuestionnaireActive: !!nextQuestion,
+    ...(nextQuestion ? { interestsCurrentCategory: nextQuestion.category } : {}),
     updatedAt: new Date(),
   });
 
@@ -323,7 +352,9 @@ async function handleAvailabilityAnswer(
 /**
  * Traite un message texte brut (pas une commande) comme une reponse au questionnaire
  * /interets en cours - appele uniquement quand `profile.interestsQuestionnaireActive`
- * est vrai (voir createChatWebhookRouter).
+ * est vrai (voir createChatWebhookRouter). Interprete toujours la reponse par rapport a
+ * la question fixee dans `interestsCurrentCategory` (celle vraiment affichee), jamais
+ * une nouvelle tiree au hasard via findNextQuestion.
  */
 async function handleInterestsAnswer(
   employeeRepository: EmployeeRepository,
@@ -334,14 +365,27 @@ async function handleInterestsAnswer(
 ): Promise<string> {
   const questions = await getCurrentQuestions(weeklyQuestionSetRepository);
   const skipped = profile.interestsSkippedCategories ?? [];
-  const question = findNextQuestion(questions, profile.interestAnswers, skipped, random);
+
+  let question = profile.interestsCurrentCategory
+    ? getQuestionByCategory(questions, profile.interestsCurrentCategory)
+    : undefined;
+  if (question && getCurrentAnswer(question, profile.interestAnswers)) {
+    question = undefined; // deja repondue entre-temps (ex: via /interets modifier)
+  }
+
   if (!question) {
+    // Etat perime (categorie jamais fixee, ou repondue par un autre chemin) - on
+    // relance proprement plutot que de mal interpreter la reponse recue.
+    const fallback = findNextQuestion(questions, profile.interestAnswers, skipped, random);
     await employeeRepository.upsert({
-      ...profile,
-      interestsQuestionnaireActive: false,
+      ...withoutCurrentCategory(profile),
+      interestsQuestionnaireActive: !!fallback,
+      ...(fallback ? { interestsCurrentCategory: fallback.category } : {}),
       updatedAt: new Date(),
     });
-    return "Ton profil de centres d'interet est deja complet ! Tape /profil pour le voir.";
+    return fallback
+      ? formatQuestionPrompt(fallback)
+      : "Ton profil de centres d'interet est deja complet ! Tape /profil pour le voir.";
   }
 
   const trimmed = rawAnswer.trim();
@@ -356,16 +400,16 @@ async function handleInterestsAnswer(
     );
 
     await employeeRepository.upsert({
-      ...profile,
+      ...withoutCurrentCategory(profile),
       interestsSkippedCategories: updatedSkipped,
       interestsQuestionnaireActive: !!nextQuestion,
+      ...(nextQuestion ? { interestsCurrentCategory: nextQuestion.category } : {}),
       updatedAt: new Date(),
     });
 
-    if (!nextQuestion) {
-      return "Question passee.\n\nTon profil de centres d'interet est complet ! Tape /profil pour le voir.";
-    }
-    return `Question passee.\n\n${formatQuestionPrompt(nextQuestion)}`;
+    return nextQuestion
+      ? `Question passee.\n\n${formatQuestionPrompt(nextQuestion)}`
+      : "Question passee.\n\nTon profil de centres d'interet est complet ! Tape /profil pour le voir.";
   }
 
   const choiceIndex = Number.parseInt(trimmed, 10) - 1;
@@ -377,21 +421,21 @@ async function handleInterestsAnswer(
 
   const updatedAnswers = [
     ...removeAnswerForCategory(profile.interestAnswers, question.category),
-    `${question.category}:${selected.id}`,
+    buildAnswerId(question.category, selected.id),
   ];
   const nextQuestion = findNextQuestion(questions, updatedAnswers, skipped, random);
 
   await employeeRepository.upsert({
-    ...profile,
+    ...withoutCurrentCategory(profile),
     interestAnswers: updatedAnswers,
     interestsQuestionnaireActive: !!nextQuestion,
+    ...(nextQuestion ? { interestsCurrentCategory: nextQuestion.category } : {}),
     updatedAt: new Date(),
   });
 
-  if (!nextQuestion) {
-    return `Enregistre : ${selected.label}.\n\nTon profil de centres d'interet est complet ! Tape /profil pour le voir.`;
-  }
-  return `Enregistre : ${selected.label}.\n\n${formatQuestionPrompt(nextQuestion)}`;
+  return nextQuestion
+    ? `Enregistre : ${selected.label}.\n\n${formatQuestionPrompt(nextQuestion)}`
+    : `Enregistre : ${selected.label}.\n\nTon profil de centres d'interet est complet ! Tape /profil pour le voir.`;
 }
 
 /**
@@ -436,7 +480,7 @@ async function handleCategoryEditAnswer(
 
   const updatedAnswers = [
     ...removeAnswerForCategory(profile.interestAnswers, question.category),
-    `${question.category}:${selected.id}`,
+    buildAnswerId(question.category, selected.id),
   ];
 
   await employeeRepository.upsert({
