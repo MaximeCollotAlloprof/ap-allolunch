@@ -171,49 +171,67 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
 }
 
 export interface ChatWebhookDeps extends ChatCommandDeps {
-  googleChatProjectNumber: string;
+  chatWebhookUrl: string;
   /** Injectable pour les tests - par defaut verifie le token via Google (google-auth-library). */
   verifyBearerToken?: BearerTokenVerifier;
+}
+
+/**
+ * Les apps Chat construites via le framework Google Workspace Add-ons (endpoint HTTP
+ * configure dans la console Google Chat API) attendent une DataActions en reponse a un
+ * appCommandPayload, pas un simple Message `{ text }` - sinon Google Chat affiche
+ * "L'app ne repond pas" malgre un 200 OK. Cf. https://developers.google.com/workspace/add-ons/chat/build
+ */
+function sendChatReply(res: Response, text: string, status = 200): void {
+  res.status(status).json({
+    hostAppDataAction: { chatDataAction: { createMessageAction: { message: { text } } } },
+  });
 }
 
 export function createChatWebhookRouter(deps: ChatWebhookDeps): Router {
   const router = Router();
   const commandHandlers = createCommandHandlers(deps);
   const verifyBearerToken =
-    deps.verifyBearerToken ?? createGoogleChatTokenVerifier(deps.googleChatProjectNumber);
+    deps.verifyBearerToken ?? createGoogleChatTokenVerifier(deps.chatWebhookUrl);
 
   router.post('/chat/webhook', async (req: Request, res: Response) => {
     const isVerified = await verifyBearerToken(req.headers.authorization);
     if (!isVerified) {
-      res.status(401).json({ text: 'Requete non autorisee.' });
+      sendChatReply(res, 'Requete non autorisee.', 401);
       return;
     }
 
+    type ChatMessage = { text?: string; sender?: { email?: string; displayName?: string } };
     const event = req.body as {
-      message?: { text?: string; sender?: { email?: string; displayName?: string } };
+      chat?: {
+        appCommandPayload?: { message?: ChatMessage };
+        messagePayload?: { message?: ChatMessage };
+      };
     };
-    const text = event.message?.text?.trim() ?? '';
+    const message = event.chat?.appCommandPayload?.message ?? event.chat?.messagePayload?.message;
+    const text = message?.text?.trim() ?? '';
     const [command, ...rest] = text.split(/\s+/);
 
     const handler = command ? commandHandlers[command] : undefined;
-    if (!handler || !event.message?.sender?.email) {
-      res.json({
-        text: `Commande inconnue. Tapez /aide pour la liste des commandes.\n\n${HELP_MESSAGE}`,
-      });
+    if (!handler || !message?.sender?.email) {
+      sendChatReply(
+        res,
+        `Commande inconnue. Tapez /aide pour la liste des commandes.\n\n${HELP_MESSAGE}`,
+      );
       return;
     }
 
     try {
       const argument = rest.join(' ');
       const reply = await handler({
-        employeeId: event.message.sender.email,
-        displayName: event.message.sender.displayName ?? event.message.sender.email,
+        employeeId: message.sender.email,
+        displayName: message.sender.displayName ?? message.sender.email,
         ...(argument ? { argument } : {}),
       });
-      res.json({ text: reply });
+      sendChatReply(res, reply);
     } catch (error) {
-      logger.error({ error }, 'chat command failed');
-      res.status(500).json({ text: 'Une erreur est survenue, reessayez plus tard.' });
+      logger.error({ err: error }, 'chat command failed');
+      sendChatReply(res, 'Une erreur est survenue, reessayez plus tard.', 500);
     }
   });
 

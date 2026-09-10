@@ -1,16 +1,19 @@
 import { OAuth2Client } from 'google-auth-library';
 import { logger } from '../logger.js';
 
-const GOOGLE_CHAT_ISSUER = 'chat@system.gserviceaccount.com';
+const GOOGLE_ISSUER = 'https://accounts.google.com';
+const CHAT_SERVICE_ACCOUNT_EMAIL_SUFFIX = '@gcp-sa-gsuiteaddons.iam.gserviceaccount.com';
 
 export type BearerTokenVerifier = (authHeader: string | undefined) => Promise<boolean>;
 
 /**
  * Cf. https://developers.google.com/workspace/chat/authenticate-authorize-chat-app
- * Google Chat signe chaque requete avec un ID token dont l'emetteur (`iss`) est
- * `chat@system.gserviceaccount.com` et l'audience le numero du projet GCP de l'app Chat.
+ * Pour une app Chat configuree via l'API Google Chat (Workspace Add-ons), le token signe
+ * par Google a pour audience (`aud`) l'URL exacte de l'endpoint webhook, pour emetteur
+ * (`iss`) `https://accounts.google.com`, et un `email` de service account se terminant par
+ * `@gcp-sa-gsuiteaddons.iam.gserviceaccount.com`.
  */
-export function createGoogleChatTokenVerifier(projectNumber: string): BearerTokenVerifier {
+export function createGoogleChatTokenVerifier(webhookUrl: string): BearerTokenVerifier {
   const client = new OAuth2Client();
 
   return async (authHeader) => {
@@ -19,11 +22,14 @@ export function createGoogleChatTokenVerifier(projectNumber: string): BearerToke
     if (!idToken) return false;
 
     try {
-      const ticket = await client.verifyIdToken({ idToken, audience: projectNumber });
+      const ticket = await client.verifyIdToken({ idToken, audience: webhookUrl });
       const payload = ticket.getPayload();
-      return payload?.iss === GOOGLE_CHAT_ISSUER;
+      return (
+        payload?.iss === GOOGLE_ISSUER &&
+        !!payload.email?.endsWith(CHAT_SERVICE_ACCOUNT_EMAIL_SUFFIX)
+      );
     } catch (error) {
-      logger.warn({ error }, 'invalid google chat bearer token');
+      logger.warn({ err: error }, 'invalid google chat bearer token');
       return false;
     }
   };
