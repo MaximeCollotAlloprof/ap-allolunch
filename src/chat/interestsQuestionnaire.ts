@@ -217,3 +217,32 @@ export function getDisplayInterestLabels(interestTags: readonly InterestTag[]): 
     })
     .map((tag) => TAG_LABELS.get(tag) ?? tag);
 }
+
+export interface SharedInterestAnswer {
+  categoryLabel: string;
+  answerLabel: string;
+}
+
+/**
+ * Pour chaque question du questionnaire, ne retient la categorie que si tous les
+ * membres ont choisi exactement la meme reponse specifique (pas juste repondu a la
+ * meme categorie avec des reponses differentes - ex: Sport/Soccer vs Sport/Raquette
+ * n'est pas un point commun).
+ */
+export function computeSharedAnswers(
+  membersInterestTags: readonly (readonly InterestTag[])[],
+): SharedInterestAnswer[] {
+  if (membersInterestTags.length === 0) return [];
+
+  const shared: SharedInterestAnswer[] = [];
+  for (const question of INTEREST_QUESTIONS) {
+    const answers = membersInterestTags.map((tags) =>
+      question.options.find((option) => tags.includes(option.tag)),
+    );
+    const [first, ...rest] = answers;
+    if (first && rest.every((answer) => answer?.tag === first.tag)) {
+      shared.push({ categoryLabel: question.categoryLabel, answerLabel: first.label });
+    }
+  }
+  return shared;
+}

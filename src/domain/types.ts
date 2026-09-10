@@ -119,6 +119,12 @@ export interface EmployeeProfile {
    * inconnue, et de reprendre le questionnaire a la bonne question plus tard.
    */
   interestsQuestionnaireActive: boolean;
+  /**
+   * Nom de la ressource Chat (`spaces/xxx`) du DM avec l'employe, capture lors de
+   * /rejoindre. Necessaire pour lui envoyer un message proactif (notification de match)
+   * qui n'est pas une reponse synchrone a une requete entrante - voir src/chat/chatNotifier.ts.
+   */
+  chatSpaceName?: string;
   createdAt: Date;
   updatedAt: Date;
 }

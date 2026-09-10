@@ -14,6 +14,8 @@ export interface ChatCommandContext {
   employeeId: string;
   displayName: string;
   argument?: string;
+  /** Nom de la ressource Chat (`spaces/xxx`) du DM courant, si connu. */
+  spaceName?: string;
 }
 
 export type ChatCommandHandler = (ctx: ChatCommandContext) => Promise<string>;
@@ -92,7 +94,13 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
       const existing = await employeeRepository.findById(ctx.employeeId);
 
       const profile: EmployeeProfile = existing
-        ? { ...existing, status: 'active', displayName: ctx.displayName, updatedAt: now }
+        ? {
+            ...existing,
+            status: 'active',
+            displayName: ctx.displayName,
+            updatedAt: now,
+            ...(ctx.spaceName ? { chatSpaceName: ctx.spaceName } : {}),
+          }
         : {
             id: ctx.employeeId,
             displayName: ctx.displayName,
@@ -102,6 +110,7 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
             interestsQuestionnaireActive: false,
             createdAt: now,
             updatedAt: now,
+            ...(ctx.spaceName ? { chatSpaceName: ctx.spaceName } : {}),
           };
 
       await employeeRepository.upsert(profile);
@@ -257,13 +266,16 @@ export function createChatWebhookRouter(deps: ChatWebhookDeps): Router {
     }
 
     type ChatMessage = { text?: string; sender?: { email?: string; displayName?: string } };
+    type ChatEventPayload = { message?: ChatMessage; space?: { name?: string } };
     const event = req.body as {
       chat?: {
-        appCommandPayload?: { message?: ChatMessage };
-        messagePayload?: { message?: ChatMessage };
+        appCommandPayload?: ChatEventPayload;
+        messagePayload?: ChatEventPayload;
       };
     };
-    const message = event.chat?.appCommandPayload?.message ?? event.chat?.messagePayload?.message;
+    const payload = event.chat?.appCommandPayload ?? event.chat?.messagePayload;
+    const message = payload?.message;
+    const spaceName = payload?.space?.name;
     const text = message?.text?.trim() ?? '';
     const senderEmail = message?.sender?.email;
 
@@ -294,6 +306,7 @@ export function createChatWebhookRouter(deps: ChatWebhookDeps): Router {
         employeeId: senderEmail,
         displayName: message?.sender?.displayName ?? senderEmail,
         ...(argument ? { argument } : {}),
+        ...(spaceName ? { spaceName } : {}),
       });
       sendChatReply(res, reply);
     } catch (error) {

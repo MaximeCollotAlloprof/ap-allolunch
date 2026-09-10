@@ -1,3 +1,4 @@
+import { google } from 'googleapis';
 import type { EmployeeId } from '../domain/types.js';
 
 export interface CreateLunchEventInput {
@@ -11,17 +12,46 @@ export interface CalendarService {
   createLunchEvent(input: CreateLunchEventInput): Promise<{ eventId: string }>;
 }
 
+const LUNCH_HOUR = 12;
+const LUNCH_DURATION_MINUTES = 60;
+
 /**
- * A implementer avec `googleapis` (calendar.events.insert) en utilisant un service account
- * avec delegation domain-wide (sujet = un des employes du groupe, ou une boite "AlloLunch").
- * Voir docs/tickets.md - lot 3.
+ * Cree l'invitation via `googleapis` (calendar.events.insert) en utilisant un service
+ * account avec delegation domain-wide (scope calendar.events), en impersonnant
+ * `organizerEmail` (`CALENDAR_DELEGATED_SERVICE_ACCOUNT_EMAIL` - un des employes du
+ * groupe, ou une boite partagee "AlloLunch"). Le service account qui execute ce code
+ * (credentials par defaut de l'environnement, ex: Cloud Run) doit deja avoir ete autorise
+ * pour ce scope dans la Google Workspace Admin Console - voir docs/tickets.md, lot 3.
  */
-export function createGoogleCalendarService(): CalendarService {
+export function createGoogleCalendarService(organizerEmail: string): CalendarService {
+  const auth = new google.auth.GoogleAuth({
+    scopes: ['https://www.googleapis.com/auth/calendar.events'],
+    clientOptions: { subject: organizerEmail },
+  });
+  const calendar = google.calendar({ version: 'v3', auth });
+
   return {
-    createLunchEvent(): Promise<{ eventId: string }> {
-      throw new Error(
-        'createGoogleCalendarService: not implemented yet (lot 3 - integration Calendar)',
-      );
+    async createLunchEvent({ attendeeEmails, proposedDate, matchGroupId }) {
+      const start = new Date(proposedDate);
+      start.setHours(LUNCH_HOUR, 0, 0, 0);
+      const end = new Date(start.getTime() + LUNCH_DURATION_MINUTES * 60_000);
+
+      const response = await calendar.events.insert({
+        calendarId: 'primary',
+        requestBody: {
+          summary: 'Diner AlloLunch',
+          description: `Groupe AlloLunch forme automatiquement (id: ${matchGroupId}).`,
+          start: { dateTime: start.toISOString() },
+          end: { dateTime: end.toISOString() },
+          attendees: attendeeEmails.map((email) => ({ email })),
+        },
+      });
+
+      const eventId = response.data.id;
+      if (!eventId) {
+        throw new Error('Google Calendar API did not return an event id');
+      }
+      return { eventId };
     },
   };
 }
