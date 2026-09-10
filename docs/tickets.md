@@ -36,11 +36,11 @@ interfaces deja definies dans le scaffold (`ChatCommandHandler`, `CalendarServic
 
 ## Lot 3 - Integration Calendar + infra/deploiement (`src/calendar/`, infra)
 
-- [ ] Configurer la delegation domain-wide du service account (Google Workspace Admin Console)
-      avec le scope `https://www.googleapis.com/auth/calendar.events`. Non teste en conditions
-      reelles faute de credentials locaux - `createGoogleCalendarService` impersonne
-      `CALENDAR_DELEGATED_SERVICE_ACCOUNT_EMAIL` comme organisateur/sujet via
-      `GoogleAuth.clientOptions.subject`; a valider/ajuster une fois la delegation configuree.
+- [x] Configurer la delegation domain-wide du service account (Google Workspace Admin Console)
+      avec le scope `https://www.googleapis.com/auth/calendar.events`. Teste en conditions
+      reelles (creation d'un vrai evenement Calendar + notification Chat pour un cycle complet) -
+      `createGoogleCalendarService` impersonne `CALENDAR_DELEGATED_SERVICE_ACCOUNT_EMAIL` comme
+      organisateur/sujet via `GoogleAuth.clientOptions.subject`.
 - [x] Implementer `createGoogleCalendarService` avec `googleapis` (`calendar.events.insert`),
       en impersonnant l'organisateur via le service account.
 - [x] Determiner le creneau propose a partir des `availableDays` communs du groupe (regle

@@ -5,6 +5,7 @@ import { formMatchGroups } from '../matching/engine.js';
 import { findCommonAvailableDay, nextDateForDayOfWeek } from '../calendar/scheduling.js';
 import type { CalendarService } from '../calendar/calendarService.js';
 import type { ChatNotifier } from '../chat/chatNotifier.js';
+import { computeSharedAnswers, type SharedInterestAnswer } from '../chat/interestsQuestionnaire.js';
 import { logger } from '../logger.js';
 import type { EmployeeRepository } from '../db/repositories/employeeRepository.js';
 import type { MatchHistoryRepository } from '../db/repositories/matchHistoryRepository.js';
@@ -23,12 +24,17 @@ export interface TriggerCycleDeps {
 function formatMatchNotification(
   others: EmployeeProfile[],
   proposedDate: Date | undefined,
+  sharedAnswers: readonly SharedInterestAnswer[],
 ): string {
   const names = others.map((o) => o.displayName).join(', ');
   const dateText = proposedDate
     ? `On propose ${proposedDate.toLocaleDateString('fr-CA', { weekday: 'long', day: 'numeric', month: 'long' })} a midi - une invitation Calendar arrive.`
     : "On n'a pas trouve de jour commun automatiquement - organisez-vous directement !";
-  return `Tu as ete matche pour un diner AlloLunch avec ${names} !\n${dateText}`;
+  const sharedText =
+    sharedAnswers.length > 0
+      ? `\nVous avez en commun:\n${sharedAnswers.map((a) => `${a.categoryLabel}: ${a.answerLabel}`).join('\n')}`
+      : '';
+  return `Tu as ete matche pour un diner AlloLunch avec ${names} !${sharedText}\n${dateText}`;
 }
 
 /**
@@ -72,13 +78,15 @@ async function notifyGroups(
       );
     }
 
+    const sharedAnswers = computeSharedAnswers(members.map((m) => m.interestTags));
+
     for (const member of members) {
       if (!member.chatSpaceName) continue;
       const others = members.filter((m) => m.id !== member.id);
       try {
         await deps.chatNotifier.sendDirectMessage(
           member.chatSpaceName,
-          formatMatchNotification(others, proposedDate),
+          formatMatchNotification(others, proposedDate, sharedAnswers),
         );
       } catch (error) {
         logger.error(

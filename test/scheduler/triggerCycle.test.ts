@@ -106,12 +106,16 @@ describe('trigger-cycle', () => {
       id: 'alice@example.com',
       displayName: 'Alice',
       availableDays: ['mardi', 'jeudi'],
+      // meme reponse (musique-rock): doit apparaitre. Sport: reponses differentes
+      // (soccer vs raquette), meme categorie large - ne doit PAS apparaitre.
+      interestTags: ['musique', 'musique-rock', 'sport', 'sport-soccer'],
       chatSpaceName: 'spaces/alice',
     });
     const bob = employee({
       id: 'bob@example.com',
       displayName: 'Bob',
       availableDays: ['jeudi'],
+      interestTags: ['musique', 'musique-rock', 'sport', 'sport-raquette'],
       chatSpaceName: 'spaces/bob',
     });
 
@@ -142,9 +146,51 @@ describe('trigger-cycle', () => {
     expect(sendDirectMessage).toHaveBeenCalledTimes(2);
     expect(sendDirectMessage).toHaveBeenCalledWith('spaces/alice', expect.stringContaining('Bob'));
     expect(sendDirectMessage).toHaveBeenCalledWith('spaces/bob', expect.stringContaining('Alice'));
+    expect(sendDirectMessage).toHaveBeenCalledWith(
+      'spaces/alice',
+      expect.stringContaining('Musique: Rock'),
+    );
+    // Sport: reponses differentes (soccer vs raquette) - pas un point commun.
+    expect(sendDirectMessage).toHaveBeenCalledWith(
+      'spaces/alice',
+      expect.not.stringContaining('Sport'),
+    );
 
     expect(savedGroups).toHaveLength(1);
     expect(savedGroups[0]?.calendarEventId).toBe('evt-123');
+  });
+
+  it("n'affiche aucune ligne de centres d'interet communs quand il n'y en a pas", async () => {
+    const alice = employee({
+      id: 'alice@example.com',
+      availableDays: ['lundi'],
+      interestTags: ['musique'],
+      chatSpaceName: 'spaces/alice',
+    });
+    const bob = employee({
+      id: 'bob@example.com',
+      availableDays: ['lundi'],
+      interestTags: ['sport'],
+      chatSpaceName: 'spaces/bob',
+    });
+
+    const createLunchEvent = createMockCalendarService(() =>
+      Promise.resolve({ eventId: 'evt-123' }),
+    );
+    const sendDirectMessage = vi.fn(() => Promise.resolve());
+
+    const { app } = createApp({
+      employees: [alice, bob],
+      calendarService: { createLunchEvent },
+      chatNotifier: { sendDirectMessage },
+    });
+
+    await triggerCycle(app);
+
+    expect(sendDirectMessage).toHaveBeenCalledWith(
+      'spaces/alice',
+      expect.not.stringContaining('en commun'),
+    );
   });
 
   it("ne cree pas d'evenement Calendar et le signale dans le message si aucun jour n'est commun", async () => {
