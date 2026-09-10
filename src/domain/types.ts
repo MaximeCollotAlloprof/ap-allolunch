@@ -30,6 +30,9 @@ export interface EmployeeProfile {
 
 export interface MatchCycle {
   id: string;
+  /** Compteur sequentiel (1, 2, 3, ...) - permet de filtrer une fenetre de N cycles sans
+   * dependre de `limit()` ni de `startedAt`. */
+  cycleIndex: number;
   startedAt: Date;
   status: 'pending' | 'completed';
 }
@@ -37,6 +40,9 @@ export interface MatchCycle {
 export interface MatchGroup {
   id: string;
   cycleId: string;
+  /** Duplique MatchCycle.cycleIndex - evite un lookup supplementaire pour filtrer par
+   * fenetre de cycles dans getRecentPairs. */
+  cycleIndex: number;
   employeeIds: EmployeeId[];
   calendarEventId?: string;
   createdAt: Date;
