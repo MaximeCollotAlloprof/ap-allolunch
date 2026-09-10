@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { loadEnv } from './config/env.js';
 import { logger } from './logger.js';
@@ -22,7 +23,7 @@ app.get('/healthz', (_req, res) => {
 app.use(
   createChatWebhookRouter({
     employeeRepository,
-    googleChatProjectNumber: env.GOOGLE_CHAT_PROJECT_NUMBER,
+    chatWebhookUrl: env.CHAT_WEBHOOK_URL,
   }),
 );
 app.use(
