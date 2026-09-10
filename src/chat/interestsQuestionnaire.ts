@@ -181,22 +181,79 @@ const TAG_LABELS: ReadonlyMap<InterestTag, string> = new Map(
   ]),
 );
 
-/** Premiere question dont aucune reponse n'a encore ete enregistree, ou undefined si complet. */
+/**
+ * Question sans reponse choisie aleatoirement (ordre different a chaque appel), ou
+ * undefined si complet. Les categories "passees" (skippedCategories - repondre 0 a une
+ * question) sont reproposees en dernier recours, une fois toutes les autres traitees.
+ * `random` est injectable pour des tests deterministes (meme convention que
+ * src/matching/engine.ts) - defaut Math.random.
+ */
 export function findNextQuestion(
   interestTags: readonly InterestTag[],
+  skippedCategories: readonly InterestTag[] = [],
+  random: () => number = Math.random,
 ): InterestQuestion | undefined {
   const answered = new Set(interestTags);
-  return INTEREST_QUESTIONS.find((question) => !question.options.some((o) => answered.has(o.tag)));
+  const skipped = new Set(skippedCategories);
+  const pending = INTEREST_QUESTIONS.filter(
+    (question) => !question.options.some((o) => answered.has(o.tag)),
+  );
+  if (pending.length === 0) return undefined;
+
+  const notSkipped = pending.filter((question) => !skipped.has(question.category));
+  const candidates = notSkipped.length > 0 ? notSkipped : pending;
+  return candidates[Math.floor(random() * candidates.length)];
 }
 
 export function formatQuestionPrompt(question: InterestQuestion): string {
-  const index = INTEREST_QUESTIONS.indexOf(question);
   const optionLines = question.options.map((option, i) => `${i + 1}. ${option.label}`).join('\n');
+  return [question.prompt, optionLines, '0. Passer cette question (elle reviendra a la fin)'].join(
+    '\n',
+  );
+}
+
+/** Numero (1-based, ordre d'affichage) -> question, pour /interets modifier|supprimer <numero>. */
+export function getQuestionByIndex(oneBasedIndex: number): InterestQuestion | undefined {
+  return INTEREST_QUESTIONS[oneBasedIndex - 1];
+}
+
+export function getQuestionByCategory(category: InterestTag): InterestQuestion | undefined {
+  return INTEREST_QUESTIONS.find((question) => question.category === category);
+}
+
+/**
+ * Liste des categories deja repondues (avec leur numero d'origine, pour rester coherent
+ * avec /interets modifier|supprimer <numero>), pour /interets modifier. Les categories
+ * sans reponse ne sont pas affichees - /interets s'occupe de les proposer.
+ */
+export function formatInterestsEditList(interestTags: readonly InterestTag[]): string {
+  const tagSet = new Set(interestTags);
+  const lines = INTEREST_QUESTIONS.map((question, index) => {
+    const answered = question.options.find((option) => tagSet.has(option.tag));
+    return answered ? `${index + 1}. ${question.categoryLabel}: ${answered.label}` : undefined;
+  }).filter((line): line is string => line !== undefined);
+
+  if (lines.length === 0) {
+    return "Tu n'as pas encore repondu a une question. Tape /interets pour commencer.";
+  }
+
   return [
-    `(Question ${index + 1}/${INTEREST_QUESTIONS.length}) ${question.prompt}`,
-    optionLines,
-    '0. Arreter (tu pourras reprendre plus tard avec /interets)',
+    "Tes centres d'interet:",
+    ...lines,
+    '',
+    'Pour changer une reponse: /interets modifier <numero>',
+    'Pour effacer une reponse: /interets supprimer <numero>',
   ].join('\n');
+}
+
+/** Prompt affiche apres /interets modifier <numero> - reponse actuelle notee, 0 pour annuler. */
+export function formatEditPrompt(
+  question: InterestQuestion,
+  currentAnswerLabel: string | undefined,
+): string {
+  const optionLines = question.options.map((option, i) => `${i + 1}. ${option.label}`).join('\n');
+  const currentLine = currentAnswerLabel ? `Reponse actuelle: ${currentAnswerLabel}\n` : '';
+  return `Modifier: ${question.categoryLabel}\n${currentLine}${question.prompt}\n${optionLines}\n0. Annuler`;
 }
 
 /**

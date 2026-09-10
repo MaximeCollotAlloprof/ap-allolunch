@@ -6,8 +6,12 @@ import type { DayOfWeek, EmployeeProfile } from '../domain/types.js';
 import { createGoogleChatTokenVerifier, type BearerTokenVerifier } from './auth.js';
 import {
   findNextQuestion,
+  formatEditPrompt,
+  formatInterestsEditList,
   formatQuestionPrompt,
   getDisplayInterestLabels,
+  getQuestionByCategory,
+  getQuestionByIndex,
 } from './interestsQuestionnaire.js';
 
 export interface ChatCommandContext {
@@ -30,6 +34,17 @@ export const DAYS_OF_WEEK: readonly DayOfWeek[] = [
 
 const NO_PROFILE_MESSAGE =
   "Tu n'as pas encore de profil AlloLunch. Tape /rejoindre pour commencer.";
+
+/**
+ * Retire interestsEditingCategory du profil - Firestore rejette un champ explicitement
+ * `undefined` (contrairement a une cle simplement absente), `delete` est donc necessaire
+ * plutot que `{ ...profile, interestsEditingCategory: undefined }`.
+ */
+function withoutEditingCategory(profile: EmployeeProfile): EmployeeProfile {
+  const next: EmployeeProfile = { ...profile };
+  delete next.interestsEditingCategory;
+  return next;
+}
 
 function formatProfile(profile: EmployeeProfile): string {
   const interestLabels = getDisplayInterestLabels(profile.interestTags);
@@ -74,6 +89,8 @@ export const HELP_MESSAGE = [
   '/rejoindre - active ton profil AlloLunch (opt-in)',
   '/pause - suspend ta participation aux prochains cycles',
   "/interets - lance ou reprend le questionnaire pour affiner tes centres d'interet",
+  '/interets modifier - liste tes reponses et permet de changer une reponse',
+  '/interets supprimer <numero> - efface la reponse de cette categorie',
   `/disponibilites <jours separes par des virgules> - definit tes jours disponibles (${DAYS_OF_WEEK.join(', ')})`,
   '/profil - affiche ton profil actuel',
   '/aide - affiche ce message',
@@ -81,10 +98,12 @@ export const HELP_MESSAGE = [
 
 export interface ChatCommandDeps {
   employeeRepository: EmployeeRepository;
+  /** Injectable pour des tests deterministes - ordre aleatoire des questions /interets. */
+  random?: () => number;
 }
 
 export function createCommandHandlers(deps: ChatCommandDeps): Record<string, ChatCommandHandler> {
-  const { employeeRepository } = deps;
+  const { employeeRepository, random } = deps;
 
   return {
     '/aide': () => Promise.resolve(HELP_MESSAGE),
@@ -139,11 +158,57 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
       const profile = await employeeRepository.findById(ctx.employeeId);
       if (!profile) return NO_PROFILE_MESSAGE;
 
-      const nextQuestion = findNextQuestion(profile.interestTags);
+      const [action, indexRaw] = (ctx.argument ?? '').trim().toLowerCase().split(/\s+/);
+
+      if (action === 'modifier' && !indexRaw) {
+        return formatInterestsEditList(profile.interestTags);
+      }
+
+      if (action === 'modifier' && indexRaw) {
+        const question = getQuestionByIndex(Number.parseInt(indexRaw, 10));
+        if (!question) {
+          return 'Numero invalide. Tape /interets modifier pour voir la liste des categories.';
+        }
+        await employeeRepository.upsert({
+          ...profile,
+          interestsEditingCategory: question.category,
+          updatedAt: new Date(),
+        });
+        const current = question.options.find((o) => profile.interestTags.includes(o.tag));
+        return formatEditPrompt(question, current?.label);
+      }
+
+      if (action === 'supprimer' && indexRaw) {
+        const question = getQuestionByIndex(Number.parseInt(indexRaw, 10));
+        if (!question) {
+          return 'Numero invalide. Tape /interets modifier pour voir la liste des categories.';
+        }
+        const categoryTags = new Set([question.category, ...question.options.map((o) => o.tag)]);
+        const updatedTags = profile.interestTags.filter((tag) => !categoryTags.has(tag));
+        await employeeRepository.upsert({
+          ...profile,
+          interestTags: updatedTags,
+          updatedAt: new Date(),
+        });
+        return `Reponse supprimee pour ${question.categoryLabel}. Tape /interets modifier pour voir ton profil.`;
+      }
+
+      if (action) {
+        return 'Argument non reconnu. Tape /interets, /interets modifier ou /interets supprimer <numero>.';
+      }
+
+      // /interets sans argument: reprend le questionnaire sequentiel a la prochaine
+      // question sans reponse. Une modification en cours (/interets modifier <n>) est
+      // abandonnee pour eviter d'interpreter la prochaine reponse au mauvais endroit.
+      const nextQuestion = findNextQuestion(
+        profile.interestTags,
+        profile.interestsSkippedCategories ?? [],
+        random,
+      );
       if (!nextQuestion) {
-        if (profile.interestsQuestionnaireActive) {
+        if (profile.interestsQuestionnaireActive || profile.interestsEditingCategory) {
           await employeeRepository.upsert({
-            ...profile,
+            ...withoutEditingCategory(profile),
             interestsQuestionnaireActive: false,
             updatedAt: new Date(),
           });
@@ -151,13 +216,11 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
         return "Ton profil de centres d'interet est deja complet ! Tape /profil pour le voir.";
       }
 
-      if (!profile.interestsQuestionnaireActive) {
-        await employeeRepository.upsert({
-          ...profile,
-          interestsQuestionnaireActive: true,
-          updatedAt: new Date(),
-        });
-      }
+      await employeeRepository.upsert({
+        ...withoutEditingCategory(profile),
+        interestsQuestionnaireActive: true,
+        updatedAt: new Date(),
+      });
       return formatQuestionPrompt(nextQuestion);
     },
 
@@ -189,8 +252,10 @@ async function handleInterestsAnswer(
   employeeRepository: EmployeeRepository,
   profile: EmployeeProfile,
   rawAnswer: string,
+  random: (() => number) | undefined,
 ): Promise<string> {
-  const question = findNextQuestion(profile.interestTags);
+  const skipped = profile.interestsSkippedCategories ?? [];
+  const question = findNextQuestion(profile.interestTags, skipped, random);
   if (!question) {
     await employeeRepository.upsert({
       ...profile,
@@ -201,13 +266,22 @@ async function handleInterestsAnswer(
   }
 
   const trimmed = rawAnswer.trim();
+
   if (trimmed === '0') {
+    const updatedSkipped = [...new Set([...skipped, question.category])];
+    const nextQuestion = findNextQuestion(profile.interestTags, updatedSkipped, random);
+
     await employeeRepository.upsert({
       ...profile,
-      interestsQuestionnaireActive: false,
+      interestsSkippedCategories: updatedSkipped,
+      interestsQuestionnaireActive: !!nextQuestion,
       updatedAt: new Date(),
     });
-    return 'Questionnaire mis en pause. Tape /interets quand tu veux reprendre.';
+
+    if (!nextQuestion) {
+      return "Question passee.\n\nTon profil de centres d'interet est complet ! Tape /profil pour le voir.";
+    }
+    return `Question passee.\n\n${formatQuestionPrompt(nextQuestion)}`;
   }
 
   const choiceIndex = Number.parseInt(trimmed, 10) - 1;
@@ -218,7 +292,7 @@ async function handleInterestsAnswer(
   }
 
   const updatedTags = [...new Set([...profile.interestTags, question.category, selected.tag])];
-  const nextQuestion = findNextQuestion(updatedTags);
+  const nextQuestion = findNextQuestion(updatedTags, skipped, random);
 
   await employeeRepository.upsert({
     ...profile,
@@ -231,6 +305,60 @@ async function handleInterestsAnswer(
     return `Enregistre : ${selected.label}.\n\nTon profil de centres d'interet est complet ! Tape /profil pour le voir.`;
   }
   return `Enregistre : ${selected.label}.\n\n${formatQuestionPrompt(nextQuestion)}`;
+}
+
+/**
+ * Traite un message texte brut comme une reponse a une modification ciblee en cours
+ * (/interets modifier <numero>) - appele en priorite sur handleInterestsAnswer quand
+ * `profile.interestsEditingCategory` est defini (voir createChatWebhookRouter).
+ */
+async function handleCategoryEditAnswer(
+  employeeRepository: EmployeeRepository,
+  profile: EmployeeProfile,
+  rawAnswer: string,
+): Promise<string> {
+  const question = profile.interestsEditingCategory
+    ? getQuestionByCategory(profile.interestsEditingCategory)
+    : undefined;
+  if (!question) {
+    await employeeRepository.upsert({
+      ...withoutEditingCategory(profile),
+      updatedAt: new Date(),
+    });
+    return 'Rien a modifier pour le moment. Tape /interets pour continuer ton profil.';
+  }
+
+  const trimmed = rawAnswer.trim();
+  if (trimmed === '0') {
+    await employeeRepository.upsert({
+      ...withoutEditingCategory(profile),
+      updatedAt: new Date(),
+    });
+    return 'Modification annulee.';
+  }
+
+  const choiceIndex = Number.parseInt(trimmed, 10) - 1;
+  const selected =
+    Number.isInteger(choiceIndex) && trimmed !== '' ? question.options[choiceIndex] : undefined;
+  if (!selected) {
+    const current = question.options.find((o) => profile.interestTags.includes(o.tag));
+    return `Reponse invalide.\n\n${formatEditPrompt(question, current?.label)}`;
+  }
+
+  const categoryTags = new Set([question.category, ...question.options.map((o) => o.tag)]);
+  const updatedTags = [
+    ...profile.interestTags.filter((tag) => !categoryTags.has(tag)),
+    question.category,
+    selected.tag,
+  ];
+
+  await employeeRepository.upsert({
+    ...withoutEditingCategory(profile),
+    interestTags: updatedTags,
+    updatedAt: new Date(),
+  });
+
+  return `Mis a jour: ${question.categoryLabel}: ${selected.label}.`;
 }
 
 export interface ChatWebhookDeps extends ChatCommandDeps {
@@ -253,7 +381,7 @@ function sendChatReply(res: Response, text: string, status = 200): void {
 
 export function createChatWebhookRouter(deps: ChatWebhookDeps): Router {
   const router = Router();
-  const { employeeRepository } = deps;
+  const { employeeRepository, random } = deps;
   const commandHandlers = createCommandHandlers(deps);
   const verifyBearerToken =
     deps.verifyBearerToken ?? createGoogleChatTokenVerifier(deps.chatWebhookUrl);
@@ -280,12 +408,18 @@ export function createChatWebhookRouter(deps: ChatWebhookDeps): Router {
     const senderEmail = message?.sender?.email;
 
     try {
-      // Un message texte brut (pas une commande) pendant un questionnaire /interets en
-      // cours est interprete comme une reponse (numero de choix, ou 0 pour arreter).
+      // Un message texte brut (pas une commande) est interprete comme une reponse au
+      // questionnaire /interets en cours - en priorite une modification ciblee
+      // (/interets modifier <numero>), sinon la progression sequentielle normale.
       if (senderEmail && !text.startsWith('/')) {
         const profile = await employeeRepository.findById(senderEmail);
+        if (profile?.interestsEditingCategory) {
+          const reply = await handleCategoryEditAnswer(employeeRepository, profile, text);
+          sendChatReply(res, reply);
+          return;
+        }
         if (profile?.interestsQuestionnaireActive) {
-          const reply = await handleInterestsAnswer(employeeRepository, profile, text);
+          const reply = await handleInterestsAnswer(employeeRepository, profile, text, random);
           sendChatReply(res, reply);
           return;
         }

@@ -24,7 +24,11 @@ export function createFirestoreEmployeeRepository(db: Firestore): EmployeeReposi
     },
 
     async upsert(profile) {
-      await collection.doc(profile.id).set(profile, { merge: true });
+      // Ecrasement complet (pas de merge): tous les appelants passent deja un
+      // EmployeeProfile complet (lu puis modifie), et un merge laisserait un champ
+      // optionnel omis (ex: interestsEditingCategory efface) intact avec son ancienne
+      // valeur au lieu de le supprimer du document.
+      await collection.doc(profile.id).set(profile);
     },
 
     async setStatus(id, status) {

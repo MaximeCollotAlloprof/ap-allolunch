@@ -12,6 +12,8 @@ interfaces deja definies dans le scaffold (`ChatCommandHandler`, `CalendarServic
 - [x] Implementer `/rejoindre` - cree/active le profil de l'employe (opt-in).
 - [x] Implementer `/pause` - passe le statut de l'employe a `paused`.
 - [x] Implementer `/interets` - flow conversationnel pour choisir des tags parmi `InterestTag`.
+- [x] `/interets modifier [numero]` et `/interets supprimer <numero>` - changer ou effacer
+      une reponse deja donnee, sans repasser par tout le questionnaire.
 - [x] Implementer `/disponibilites` - saisie des jours disponibles (`DayOfWeek`).
 - [x] Implementer `/profil` - affiche le profil courant de l'employe.
 - [x] Message de notification envoye a chaque membre d'un groupe quand un match est cree

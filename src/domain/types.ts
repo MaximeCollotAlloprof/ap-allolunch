@@ -125,6 +125,19 @@ export interface EmployeeProfile {
    * qui n'est pas une reponse synchrone a une requete entrante - voir src/chat/chatNotifier.ts.
    */
   chatSpaceName?: string;
+  /**
+   * Categorie ciblee par /interets modifier <numero> - le prochain message texte brut
+   * (numero de choix, ou 0 pour annuler) modifie cette categorie precise plutot que la
+   * prochaine question sans reponse.
+   */
+  interestsEditingCategory?: InterestTag;
+  /**
+   * Categories "passees" en repondant 0 a une question du questionnaire /interets - reproposees
+   * seulement une fois toutes les autres questions sans reponse traitees. Ne participe
+   * jamais au matching (contrairement a interestTags) - sert uniquement a ordonner le
+   * questionnaire.
+   */
+  interestsSkippedCategories?: InterestTag[];
   createdAt: Date;
   updatedAt: Date;
 }
