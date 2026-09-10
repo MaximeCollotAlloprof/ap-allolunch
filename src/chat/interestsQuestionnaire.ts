@@ -208,13 +208,22 @@ export function getQuestionByCategory(category: InterestTag): InterestQuestion |
   return INTEREST_QUESTIONS.find((question) => question.category === category);
 }
 
-/** Liste numerotee des 12 categories avec la reponse actuelle, pour /interets modifier. */
+/**
+ * Liste des categories deja repondues (avec leur numero d'origine, pour rester coherent
+ * avec /interets modifier|supprimer <numero>), pour /interets modifier. Les categories
+ * sans reponse ne sont pas affichees - /interets s'occupe de les proposer.
+ */
 export function formatInterestsEditList(interestTags: readonly InterestTag[]): string {
   const tagSet = new Set(interestTags);
   const lines = INTEREST_QUESTIONS.map((question, index) => {
     const answered = question.options.find((option) => tagSet.has(option.tag));
-    return `${index + 1}. ${question.categoryLabel}: ${answered ? answered.label : '(non repondu)'}`;
-  });
+    return answered ? `${index + 1}. ${question.categoryLabel}: ${answered.label}` : undefined;
+  }).filter((line): line is string => line !== undefined);
+
+  if (lines.length === 0) {
+    return "Tu n'as pas encore repondu a une question. Tape /interets pour commencer.";
+  }
+
   return [
     "Tes centres d'interet:",
     ...lines,

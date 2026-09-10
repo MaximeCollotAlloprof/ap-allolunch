@@ -248,7 +248,7 @@ describe('chat webhook', () => {
     expect(res.text).toMatch(/actif/);
   });
 
-  it("/interets modifier liste les 12 categories avec la reponse actuelle ou 'non repondu'", async () => {
+  it('/interets modifier ne liste que les categories deja repondues', async () => {
     const repo = createInMemoryEmployeeRepository();
     const app = createApp(repo);
 
@@ -258,7 +258,17 @@ describe('chat webhook', () => {
     const res = await sendMessage(app, '/interets modifier');
 
     expect(res.text).toMatch(/1\. Cuisine: Italienne/);
-    expect(res.text).toMatch(/2\. Sport: \(non repondu\)/);
+    expect(res.text).not.toMatch(/Sport/);
+  });
+
+  it("/interets modifier indique qu'il n'y a rien a modifier avant la premiere reponse", async () => {
+    const repo = createInMemoryEmployeeRepository();
+    const app = createApp(repo);
+
+    await sendMessage(app, '/rejoindre');
+    const res = await sendMessage(app, '/interets modifier');
+
+    expect(res.text).toMatch(/pas encore repondu/);
   });
 
   it('/interets modifier <numero> permet de changer une reponse existante', async () => {
