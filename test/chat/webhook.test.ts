@@ -36,22 +36,42 @@ function createApp(employeeRepository: EmployeeRepository) {
   return app;
 }
 
-interface WebhookResponse {
+interface WebhookResult {
   status: number;
-  body: { text: string };
+  text: string;
+}
+
+/**
+ * Le webhook repond via la DataActions attendue par le framework Google Workspace
+ * Add-ons (hostAppDataAction.chatDataAction.createMessageAction), pas un simple
+ * `{ text }` - voir le commentaire sur sendChatReply dans src/chat/webhook.ts.
+ */
+function extractResult(res: unknown): WebhookResult {
+  const typed = res as {
+    status: number;
+    body: {
+      hostAppDataAction?: {
+        chatDataAction?: { createMessageAction?: { message?: { text?: string } } };
+      };
+    };
+  };
+  return {
+    status: typed.status,
+    text: typed.body.hostAppDataAction?.chatDataAction?.createMessageAction?.message?.text ?? '',
+  };
 }
 
 async function sendMessage(
   app: express.Express,
   text: string,
   email = 'alice@example.com',
-): Promise<WebhookResponse> {
-  const res: unknown = await request(app)
+): Promise<WebhookResult> {
+  const res = await request(app)
     .post('/chat/webhook')
     .send({
       chat: { appCommandPayload: { message: { text, sender: { email, displayName: 'Alice' } } } },
     });
-  return res as WebhookResponse;
+  return extractResult(res);
 }
 
 describe('chat webhook', () => {
@@ -68,7 +88,7 @@ describe('chat webhook', () => {
 
     const res = await request(app)
       .post('/chat/webhook')
-      .send({ message: { text: '/aide' } });
+      .send({ chat: { appCommandPayload: { message: { text: '/aide' } } } });
     expect(res.status).toBe(401);
   });
 
@@ -77,7 +97,7 @@ describe('chat webhook', () => {
     const app = createApp(repo);
 
     const res = await sendMessage(app, '/rejoindre');
-    expect(res.body.text).toMatch(/Bienvenue/);
+    expect(res.text).toMatch(/Bienvenue/);
 
     const profile = await repo.findById('alice@example.com');
     expect(profile?.status).toBe('active');
@@ -86,7 +106,7 @@ describe('chat webhook', () => {
   it('/pause sans profil existant renvoie un message explicite', async () => {
     const app = createApp(createInMemoryEmployeeRepository());
     const res = await sendMessage(app, '/pause');
-    expect(res.body.text).toMatch(/pas encore de profil/);
+    expect(res.text).toMatch(/pas encore de profil/);
   });
 
   it('/pause met a jour un profil existant', async () => {
@@ -107,7 +127,7 @@ describe('chat webhook', () => {
     await sendMessage(app, '/rejoindre');
     const res = await sendMessage(app, '/interets cuisine, sport');
 
-    expect(res.body.text).toMatch(/cuisine, sport/);
+    expect(res.text).toMatch(/cuisine, sport/);
     const profile = await repo.findById('alice@example.com');
     expect(profile?.interestTags).toEqual(['cuisine', 'sport']);
   });
@@ -119,7 +139,7 @@ describe('chat webhook', () => {
     await sendMessage(app, '/rejoindre');
     const res = await sendMessage(app, '/interets cuisine,escrime');
 
-    expect(res.body.text).toMatch(/inconnu/);
+    expect(res.text).toMatch(/inconnu/);
     const profile = await repo.findById('alice@example.com');
     expect(profile?.interestTags).toEqual([]);
   });
@@ -131,7 +151,7 @@ describe('chat webhook', () => {
     await sendMessage(app, '/rejoindre');
     const res = await sendMessage(app, '/disponibilites lundi,jeudi');
 
-    expect(res.body.text).toMatch(/lundi, jeudi/);
+    expect(res.text).toMatch(/lundi, jeudi/);
     const profile = await repo.findById('alice@example.com');
     expect(profile?.availableDays).toEqual(['lundi', 'jeudi']);
   });
@@ -144,14 +164,14 @@ describe('chat webhook', () => {
     await sendMessage(app, '/interets cuisine');
     const res = await sendMessage(app, '/profil');
 
-    expect(res.body.text).toMatch(/cuisine/);
-    expect(res.body.text).toMatch(/actif/);
+    expect(res.text).toMatch(/cuisine/);
+    expect(res.text).toMatch(/actif/);
   });
 
   it('commande inconnue renvoie la liste des commandes', async () => {
     const app = createApp(createInMemoryEmployeeRepository());
     const res = await sendMessage(app, '/blabla');
-    expect(res.body.text).toMatch(/Commande inconnue/);
-    expect(res.body.text).toMatch(/\/aide/);
+    expect(res.text).toMatch(/Commande inconnue/);
+    expect(res.text).toMatch(/\/aide/);
   });
 });
