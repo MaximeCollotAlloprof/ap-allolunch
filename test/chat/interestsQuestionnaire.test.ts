@@ -9,7 +9,9 @@ describe('computeSharedAnswers', () => {
 
     const shared = computeSharedAnswers(TEST_QUESTIONS, [alice, bob]);
 
-    expect(shared).toEqual([{ categoryLabel: 'Musique', answerLabel: 'Rock' }]);
+    expect(shared).toEqual([
+      { prompt: 'Quel est ton style de musique prefere ?', answerLabel: 'Rock' },
+    ]);
   });
 
   it('ignore une categorie ou un membre n’a pas encore repondu', () => {
@@ -26,7 +28,7 @@ describe('computeSharedAnswers', () => {
 
     expect(computeSharedAnswers(TEST_QUESTIONS, [alice, bob, carol])).toEqual([]);
     expect(computeSharedAnswers(TEST_QUESTIONS, [alice, bob])).toEqual([
-      { categoryLabel: 'Cuisine', answerLabel: 'Italienne' },
+      { prompt: 'Quel type de cuisine preferes-tu pour un diner ?', answerLabel: 'Italienne' },
     ]);
   });
 

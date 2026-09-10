@@ -169,7 +169,7 @@ describe('trigger-cycle', () => {
     ]);
     expect(callArgs?.proposedDate.getDay()).toBe(4); // jeudi
     expect(callArgs?.description).toBe(
-      "It's a match! Vous avez un rendez-vous pour un diner AlloLunch! Vous avez en commun :\nMusique: Rock",
+      "It's a match! Vous avez un rendez-vous pour un diner AlloLunch! Vous avez en commun :\n- Quel est ton style de musique prefere ? Rock",
     );
 
     expect(sendDirectMessage).toHaveBeenCalledTimes(3);
@@ -177,12 +177,12 @@ describe('trigger-cycle', () => {
     expect(sendDirectMessage).toHaveBeenCalledWith('spaces/bob', expect.stringContaining('Alice'));
     expect(sendDirectMessage).toHaveBeenCalledWith(
       'spaces/alice',
-      expect.stringContaining('Musique: Rock'),
+      expect.stringContaining('- Quel est ton style de musique prefere ? Rock'),
     );
     // Sport: reponses differentes (et Carol n'a pas repondu) - pas un point commun.
     expect(sendDirectMessage).toHaveBeenCalledWith(
       'spaces/alice',
-      expect.not.stringContaining('Sport'),
+      expect.not.stringContaining('Quel sport te passionne le plus'),
     );
 
     expect(savedGroups).toHaveLength(1);

@@ -34,15 +34,19 @@ function formatMatchNotification(
     : "On n'a pas trouve de jour commun automatiquement - organisez-vous directement !";
   const sharedText =
     sharedAnswers.length > 0
-      ? `\nVous avez en commun:\n${sharedAnswers.map((a) => `${a.categoryLabel}: ${a.answerLabel}`).join('\n')}`
+      ? `\nVous avez en commun:\n${formatSharedAnswersBulletList(sharedAnswers)}`
       : '';
   return `It's a match! Tu as un rendez-vous pour un diner AlloLunch avec ${names} !${sharedText}\n${dateText}`;
+}
+
+function formatSharedAnswersBulletList(sharedAnswers: readonly SharedInterestAnswer[]): string {
+  return sharedAnswers.map((a) => `- ${a.prompt} ${a.answerLabel}`).join('\n');
 }
 
 function formatEventDescription(sharedAnswers: readonly SharedInterestAnswer[]): string {
   const sharedText =
     sharedAnswers.length > 0
-      ? sharedAnswers.map((a) => `${a.categoryLabel}: ${a.answerLabel}`).join('\n')
+      ? formatSharedAnswersBulletList(sharedAnswers)
       : 'Aucun point commun detecte cette semaine.';
   return `It's a match! Vous avez un rendez-vous pour un diner AlloLunch! Vous avez en commun :\n${sharedText}`;
 }

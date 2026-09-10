@@ -150,7 +150,7 @@ export function getAnsweredQuestions(
 }
 
 export interface SharedInterestAnswer {
-  categoryLabel: string;
+  prompt: string;
   answerLabel: string;
 }
 
@@ -176,7 +176,7 @@ export function computeSharedAnswers(
       const optionId = parseAnswerId(first)?.optionId;
       const option = question.options.find((o) => o.id === optionId);
       if (option) {
-        shared.push({ categoryLabel: question.categoryLabel, answerLabel: option.label });
+        shared.push({ prompt: question.prompt, answerLabel: option.label });
       }
     }
   }
