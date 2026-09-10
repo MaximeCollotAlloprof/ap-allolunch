@@ -43,6 +43,7 @@ d'authentification GCP au demarrage - si vous en voyez une, verifiez que
 ```bash
 curl -X POST http://localhost:8080/chat/webhook \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <id_token_google_chat>" \
   -d '{"message":{"text":"/profil","sender":{"email":"test@alloprof.qc.ca","displayName":"Test"}}}'
 ```
 
