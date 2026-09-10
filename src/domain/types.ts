@@ -128,10 +128,9 @@ export interface EmployeeProfile {
   /**
    * Categorie ciblee par /interets modifier <numero> - le prochain message texte brut
    * (numero de choix, ou 0 pour annuler) modifie cette categorie precise plutot que la
-   * prochaine question sans reponse. `| undefined` explicite pour pouvoir l'effacer une
-   * fois la modification faite ou annulee (cf. exactOptionalPropertyTypes).
+   * prochaine question sans reponse.
    */
-  interestsEditingCategory?: InterestTag | undefined;
+  interestsEditingCategory?: InterestTag;
   createdAt: Date;
   updatedAt: Date;
 }

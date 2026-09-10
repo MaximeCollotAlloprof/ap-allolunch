@@ -35,6 +35,17 @@ export const DAYS_OF_WEEK: readonly DayOfWeek[] = [
 const NO_PROFILE_MESSAGE =
   "Tu n'as pas encore de profil AlloLunch. Tape /rejoindre pour commencer.";
 
+/**
+ * Retire interestsEditingCategory du profil - Firestore rejette un champ explicitement
+ * `undefined` (contrairement a une cle simplement absente), `delete` est donc necessaire
+ * plutot que `{ ...profile, interestsEditingCategory: undefined }`.
+ */
+function withoutEditingCategory(profile: EmployeeProfile): EmployeeProfile {
+  const next: EmployeeProfile = { ...profile };
+  delete next.interestsEditingCategory;
+  return next;
+}
+
 function formatProfile(profile: EmployeeProfile): string {
   const interestLabels = getDisplayInterestLabels(profile.interestTags);
   const interests = interestLabels.length > 0 ? interestLabels.join(', ') : 'aucun';
@@ -191,9 +202,8 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
       if (!nextQuestion) {
         if (profile.interestsQuestionnaireActive || profile.interestsEditingCategory) {
           await employeeRepository.upsert({
-            ...profile,
+            ...withoutEditingCategory(profile),
             interestsQuestionnaireActive: false,
-            interestsEditingCategory: undefined,
             updatedAt: new Date(),
           });
         }
@@ -201,9 +211,8 @@ export function createCommandHandlers(deps: ChatCommandDeps): Record<string, Cha
       }
 
       await employeeRepository.upsert({
-        ...profile,
+        ...withoutEditingCategory(profile),
         interestsQuestionnaireActive: true,
-        interestsEditingCategory: undefined,
         updatedAt: new Date(),
       });
       return formatQuestionPrompt(nextQuestion);
@@ -296,8 +305,7 @@ async function handleCategoryEditAnswer(
     : undefined;
   if (!question) {
     await employeeRepository.upsert({
-      ...profile,
-      interestsEditingCategory: undefined,
+      ...withoutEditingCategory(profile),
       updatedAt: new Date(),
     });
     return 'Rien a modifier pour le moment. Tape /interets pour continuer ton profil.';
@@ -306,8 +314,7 @@ async function handleCategoryEditAnswer(
   const trimmed = rawAnswer.trim();
   if (trimmed === '0') {
     await employeeRepository.upsert({
-      ...profile,
-      interestsEditingCategory: undefined,
+      ...withoutEditingCategory(profile),
       updatedAt: new Date(),
     });
     return 'Modification annulee.';
@@ -329,9 +336,8 @@ async function handleCategoryEditAnswer(
   ];
 
   await employeeRepository.upsert({
-    ...profile,
+    ...withoutEditingCategory(profile),
     interestTags: updatedTags,
-    interestsEditingCategory: undefined,
     updatedAt: new Date(),
   });
 
