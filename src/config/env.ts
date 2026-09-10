@@ -3,7 +3,10 @@ import { z } from 'zod';
 const envSchema = z.object({
   PORT: z.coerce.number().default(8080),
   FIRESTORE_PROJECT_ID: z.string().min(1),
-  GOOGLE_CHAT_PROJECT_NUMBER: z.string().min(1),
+  // URL publique exacte de l'endpoint webhook, telle que configuree dans la console
+  // Google Chat API (Configuration > Connection settings > HTTP endpoint URL). C'est
+  // l'audience attendue dans le token signe par Google (cf. src/chat/auth.ts).
+  CHAT_WEBHOOK_URL: z.string().url(),
   CALENDAR_DELEGATED_SERVICE_ACCOUNT_EMAIL: z.string().email(),
   MATCH_HISTORY_WINDOW_CYCLES: z.coerce.number().int().positive().default(4),
 });

@@ -14,6 +14,12 @@ de developpement, et [docs/tickets.md](docs/tickets.md) pour le decoupage du tra
 
 ## Demarrage
 
+Pour lancer AlloLunch en local sans dependance a un vrai projet GCP (emulateur
+Firestore), voir [docs/local-dev.md](docs/local-dev.md) - c'est le point de depart
+recommande avant tout deploiement.
+
+Pour un lancement contre un vrai projet GCP:
+
 ```bash
 cp .env.example .env   # remplir les valeurs (voir docs/tickets.md - lot 3)
 npm install

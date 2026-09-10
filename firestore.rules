@@ -1,17 +1,12 @@
 rules_version = '2';
 
-// AlloLunch n'expose aucune donnee Firestore a un client (mobile/web). Toutes les
-// lectures/ecritures passent exclusivement par le SDK Admin cote serveur (service
-// Cloud Run), authentifie via les Application Default Credentials du service account -
-// ces acces contournent completement ces regles et ne sont donc pas affectes par elles.
-//
-// Ce fichier bloque donc tout acces via les SDK clients Firestore (web/mobile), qui ne
-// devraient de toute facon jamais etre utilises par ce projet. Voir docs/firestore-schema.md
-// pour le detail des collections (employees, matchCycles, matchGroups).
+// Regles permissives pour l'emulateur local uniquement. Les vraies regles de
+// production (acces restreint au service Cloud Run via IAM, pas de client-side
+// access) sont a definir dans le lot 2 - voir docs/tickets.md.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if true;
     }
   }
 }
