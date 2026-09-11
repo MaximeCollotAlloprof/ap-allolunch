@@ -19,6 +19,10 @@ cp .env.local.example .env
 `FIRESTORE_PROJECT_ID=demo-allolunch` utilise le prefixe `demo-` reconnu par l'emulateur
 Firestore: aucune authentification GCP n'est necessaire.
 
+`GEMINI_API_KEY` reste obligatoire meme en local (validation au demarrage) - necessaire
+pour tester `/scheduler/weekly-reset` (voir section 5). Cle gratuite sur
+https://aistudio.google.com/apikey.
+
 ## 2. Demarrer l'emulateur Firestore (terminal 1)
 
 ```bash
@@ -62,18 +66,33 @@ l'API Google Chat / Workspace Add-ons) ressemble a:
 }
 ```
 
-## 5. Declencher un cycle de matching
+## 5. Declencher le cycle hebdomadaire (reset du lundi + matching du vendredi)
 
-Ajouter d'abord quelques employes actifs directement dans l'emulateur (via son UI sur
-http://localhost:4001, collection `employees`), puis:
+`/rejoindre` refuse de participer tant qu'aucun `WeeklyQuestionSet` n'est `ready` -
+commencer par generer les questions de la semaine (vrai appel a l'API Gemini, necessite
+`GEMINI_API_KEY`):
+
+```bash
+curl -X POST http://localhost:8080/scheduler/weekly-reset
+```
+
+La reponse indique `status: "ready"` (questions generees, tous les profils remis a zero)
+ou `status: "paused"` (Gemini a echoue - aucun profil touche, semaine annoncee en pause).
+Le document `weeklyQuestionSets/current` est visible dans l'UI de l'emulateur.
+
+Ensuite, faire `/rejoindre` pour chaque employe de test via le webhook (voir section 4) -
+ca demande d'abord les disponibilites, puis enchaine automatiquement sur les questions
+generees. Une fois au moins deux employes actifs avec des disponibilites, declencher le
+matching:
 
 ```bash
 curl -X POST http://localhost:8080/scheduler/trigger-cycle
 ```
 
-La reponse contient `groupCount` et `deferredCount`. Les groupes crees sont visibles dans
-la collection `matchGroups` de l'UI de l'emulateur - ca valide tout le pipeline
-(lecture des employes actifs -> moteur de matching -> persistance) sans dependance GCP.
+La reponse contient `groupCount` et `deferredCount` (ou `status: "paused"` si la semaine
+est en pause). Les groupes crees sont visibles dans la collection `matchGroups` de l'UI de
+l'emulateur - ca valide tout le pipeline (lecture des employes actifs -> moteur de
+matching -> persistance) sans dependance GCP autre que l'appel Gemini.
 
 ## 6. Exposer le bot a Google Chat depuis votre poste (tunnel HTTPS)
 

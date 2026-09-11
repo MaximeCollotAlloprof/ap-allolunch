@@ -5,6 +5,8 @@ import { COLLECTIONS } from '../firestore.js';
 export interface EmployeeRepository {
   findById(id: EmployeeId): Promise<EmployeeProfile | undefined>;
   listActive(): Promise<EmployeeProfile[]>;
+  /** Tous les employes connus, actifs ou non - utilise par le reset hebdomadaire. */
+  listAll(): Promise<EmployeeProfile[]>;
   upsert(profile: EmployeeProfile): Promise<void>;
   setStatus(id: EmployeeId, status: EmployeeProfile['status']): Promise<void>;
 }
@@ -20,6 +22,11 @@ export function createFirestoreEmployeeRepository(db: Firestore): EmployeeReposi
 
     async listActive() {
       const snapshot = await collection.where('status', '==', 'active').get();
+      return snapshot.docs.map((doc) => doc.data() as EmployeeProfile);
+    },
+
+    async listAll() {
+      const snapshot = await collection.get();
       return snapshot.docs.map((doc) => doc.data() as EmployeeProfile);
     },
 

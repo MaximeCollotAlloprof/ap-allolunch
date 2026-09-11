@@ -16,4 +16,5 @@ export const COLLECTIONS = {
   employees: 'employees',
   matchCycles: 'matchCycles',
   matchGroups: 'matchGroups',
+  weeklyQuestionSets: 'weeklyQuestionSets',
 } as const;

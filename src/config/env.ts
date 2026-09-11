@@ -9,6 +9,9 @@ const envSchema = z.object({
   CHAT_WEBHOOK_URL: z.string().url(),
   CALENDAR_DELEGATED_SERVICE_ACCOUNT_EMAIL: z.string().email(),
   MATCH_HISTORY_WINDOW_CYCLES: z.coerce.number().int().positive().default(4),
+  // Cle API Gemini (Google AI Studio) - genere les questions hebdomadaires du
+  // questionnaire /interets. Voir src/ai/geminiQuestionGenerator.ts.
+  GEMINI_API_KEY: z.string().min(1),
 });
 
 export type Env = z.infer<typeof envSchema>;

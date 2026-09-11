@@ -10,12 +10,14 @@ import { logger } from '../logger.js';
 import type { EmployeeRepository } from '../db/repositories/employeeRepository.js';
 import type { MatchHistoryRepository } from '../db/repositories/matchHistoryRepository.js';
 import type { MatchCycleRepository } from '../db/repositories/matchCycleRepository.js';
-import type { EmployeeProfile, MatchGroup } from '../domain/types.js';
+import type { WeeklyQuestionSetRepository } from '../db/repositories/weeklyQuestionSetRepository.js';
+import type { EmployeeProfile, MatchGroup, WeeklyQuestion } from '../domain/types.js';
 
 export interface TriggerCycleDeps {
   employeeRepository: EmployeeRepository;
   matchHistoryRepository: MatchHistoryRepository;
   matchCycleRepository: MatchCycleRepository;
+  weeklyQuestionSetRepository: WeeklyQuestionSetRepository;
   matchHistoryWindowCycles: number;
   calendarService: CalendarService;
   chatNotifier: ChatNotifier;
@@ -32,9 +34,21 @@ function formatMatchNotification(
     : "On n'a pas trouve de jour commun automatiquement - organisez-vous directement !";
   const sharedText =
     sharedAnswers.length > 0
-      ? `\nVous avez en commun:\n${sharedAnswers.map((a) => `${a.categoryLabel}: ${a.answerLabel}`).join('\n')}`
+      ? `\nVous avez en commun:\n${formatSharedAnswersBulletList(sharedAnswers)}`
       : '';
   return `It's a match! Tu as un rendez-vous pour un diner AlloLunch avec ${names} !${sharedText}\n${dateText}`;
+}
+
+function formatSharedAnswersBulletList(sharedAnswers: readonly SharedInterestAnswer[]): string {
+  return sharedAnswers.map((a) => `- ${a.prompt} ${a.answerLabel}`).join('\n');
+}
+
+function formatEventDescription(sharedAnswers: readonly SharedInterestAnswer[]): string {
+  const sharedText =
+    sharedAnswers.length > 0
+      ? formatSharedAnswersBulletList(sharedAnswers)
+      : 'Aucun point commun detecte cette semaine.';
+  return `It's a match! Vous avez un rendez-vous pour un diner AlloLunch! Vous avez en commun :\n${sharedText}`;
 }
 
 /**
@@ -48,6 +62,7 @@ async function notifyGroups(
   matchGroups: MatchGroup[],
   employeesById: ReadonlyMap<string, EmployeeProfile>,
   startedAt: Date,
+  questions: readonly WeeklyQuestion[],
 ): Promise<void> {
   for (const group of matchGroups) {
     const members = group.employeeIds
@@ -57,12 +72,17 @@ async function notifyGroups(
     const commonDay = findCommonAvailableDay(members.map((m) => m.availableDays));
     const proposedDate = commonDay ? nextDateForDayOfWeek(commonDay, startedAt) : undefined;
 
+    const sharedAnswers = computeSharedAnswers(
+      questions,
+      members.map((m) => m.interestAnswers),
+    );
+
     if (proposedDate) {
       try {
         const { eventId } = await deps.calendarService.createLunchEvent({
           attendeeEmails: members.map((m) => m.id),
           proposedDate,
-          matchGroupId: group.id,
+          description: formatEventDescription(sharedAnswers),
         });
         group.calendarEventId = eventId;
       } catch (error) {
@@ -77,8 +97,6 @@ async function notifyGroups(
         'no common available day for group, skipping calendar event',
       );
     }
-
-    const sharedAnswers = computeSharedAnswers(members.map((m) => m.interestTags));
 
     for (const member of members) {
       if (!member.chatSpaceName) continue;
@@ -106,6 +124,14 @@ export function createTriggerCycleRouter(deps: TriggerCycleDeps): Router {
   const router = Router();
 
   router.post('/scheduler/trigger-cycle', async (_req: Request, res: Response) => {
+    const questionSet = await deps.weeklyQuestionSetRepository.get();
+    if (!questionSet || questionSet.status === 'paused') {
+      logger.info({ weekId: questionSet?.weekId }, 'skipping match cycle - week is paused');
+      res.json({ status: 'paused', groupCount: 0, deferredCount: 0 });
+      return;
+    }
+    const questions = questionSet.questions;
+
     const cycleId = randomUUID();
     const startedAt = new Date();
     const latestCycleIndex = await deps.matchCycleRepository.getLatestCycleIndex();
@@ -126,7 +152,7 @@ export function createTriggerCycleRouter(deps: TriggerCycleDeps): Router {
       );
 
       const { groups, deferred } = formMatchGroups(
-        employees.map((e) => ({ employeeId: e.id, interestTags: e.interestTags })),
+        employees.map((e) => ({ employeeId: e.id, interestAnswers: e.interestAnswers })),
         recentPairs,
       );
 
@@ -139,7 +165,7 @@ export function createTriggerCycleRouter(deps: TriggerCycleDeps): Router {
       }));
 
       const employeesById = new Map(employees.map((e) => [e.id, e]));
-      await notifyGroups(deps, matchGroups, employeesById, startedAt);
+      await notifyGroups(deps, matchGroups, employeesById, startedAt, questions);
 
       await deps.matchHistoryRepository.saveGroups(matchGroups);
       await deps.matchCycleRepository.markCompleted(cycleId);

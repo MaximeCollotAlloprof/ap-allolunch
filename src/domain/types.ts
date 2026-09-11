@@ -1,106 +1,68 @@
 export type EmployeeId = string;
 
 /**
- * Liste fermee des centres d'interet. Chaque categorie "large" (ex: `musique`) a des
- * tags "specifiques" associes (ex: `musique-rock`) proposes via le questionnaire
- * /interets - voir src/chat/interestsQuestionnaire.ts pour les questions/reponses et
- * l'association categorie -> tags specifiques.
+ * Les 12 categories larges de centres d'interet - fixes, ne changent jamais. Chaque
+ * semaine, Gemini genere une question + des reponses a choix multiples POUR chacune de
+ * ces categories (voir src/ai/geminiQuestionGenerator.ts) - les reponses elles-memes ne
+ * sont plus une liste fermee en dur, contrairement aux categories. Inspirees d'un
+ * questionnaire style appli de rencontre (gouts, personnalite, habitudes) plutot que de
+ * simples centres d'interet factuels, pour mieux faire ressortir des points communs.
  */
-export type InterestTag =
-  // Categories larges
-  | 'cuisine'
-  | 'sport'
-  | 'voyage'
-  | 'technologie'
-  | 'jeux-video'
-  | 'lecture'
+export type InterestCategory =
   | 'musique'
-  | 'cinema'
-  | 'plein-air'
-  | 'art-creatif'
-  | 'famille-enfants'
-  | 'entrepreneuriat'
-  // cuisine
-  | 'cuisine-italienne'
-  | 'cuisine-asiatique'
-  | 'cuisine-mexicaine'
-  | 'cuisine-vegetarienne'
-  | 'cuisine-quebecoise'
-  | 'cuisine-street-food'
-  // sport
-  | 'sport-hockey'
-  | 'sport-soccer'
-  | 'sport-course'
-  | 'sport-musculation'
-  | 'sport-raquette'
-  | 'sport-aquatique'
-  // voyage
-  | 'voyage-plage'
-  | 'voyage-aventure'
-  | 'voyage-grandes-villes'
-  | 'voyage-road-trip'
-  | 'voyage-sac-a-dos'
-  | 'voyage-tout-inclus'
-  // technologie
-  | 'technologie-ia'
-  | 'technologie-developpement'
-  | 'technologie-gadgets'
-  | 'technologie-cybersecurite'
-  | 'technologie-jeux-high-tech'
-  // jeux-video
-  | 'jeux-video-action-aventure'
-  | 'jeux-video-strategie'
-  | 'jeux-video-rpg'
-  | 'jeux-video-sport-course'
-  | 'jeux-video-multijoueur'
-  | 'jeux-video-mobile'
-  // lecture
-  | 'lecture-romans'
-  | 'lecture-essais'
-  | 'lecture-science-fiction'
-  | 'lecture-polar'
-  | 'lecture-bd'
-  | 'lecture-developpement-personnel'
-  // musique
-  | 'musique-rock'
-  | 'musique-pop'
-  | 'musique-rap'
-  | 'musique-electro'
-  | 'musique-jazz'
-  | 'musique-classique'
-  // cinema
-  | 'cinema-action'
-  | 'cinema-comedie'
-  | 'cinema-drame'
-  | 'cinema-horreur'
-  | 'cinema-science-fiction'
-  | 'cinema-documentaire'
-  // plein-air
-  | 'plein-air-randonnee'
-  | 'plein-air-velo'
-  | 'plein-air-camping'
-  | 'plein-air-sports-hiver'
-  | 'plein-air-jardinage'
-  | 'plein-air-peche-chasse'
-  // art-creatif
-  | 'art-creatif-dessin'
-  | 'art-creatif-photographie'
-  | 'art-creatif-instrument'
-  | 'art-creatif-ecriture'
-  | 'art-creatif-artisanat'
-  | 'art-creatif-danse'
-  // famille-enfants
-  | 'famille-enfants-jeunes-enfants'
-  | 'famille-enfants-ados'
-  | 'famille-enfants-futur-parent'
-  | 'famille-enfants-activites-familiales'
-  | 'famille-enfants-sans-enfants'
-  // entrepreneuriat
-  | 'entrepreneuriat-startup'
-  | 'entrepreneuriat-investissement'
-  | 'entrepreneuriat-freelance'
-  | 'entrepreneuriat-leadership'
-  | 'entrepreneuriat-innovation';
+  | 'films-series-culture-pop'
+  | 'cuisine-gastronomie'
+  | 'voyages-decouvertes'
+  | 'sports-activites'
+  | 'jeux-loisirs'
+  | 'culture-curiosite'
+  | 'mode-de-vie-habitudes'
+  | 'personnalite-facon-de-penser'
+  | 'relations-vie-sociale'
+  | 'humour-insolite'
+  | 'preferences-would-you-rather';
+
+export const INTEREST_CATEGORIES: readonly InterestCategory[] = [
+  'musique',
+  'films-series-culture-pop',
+  'cuisine-gastronomie',
+  'voyages-decouvertes',
+  'sports-activites',
+  'jeux-loisirs',
+  'culture-curiosite',
+  'mode-de-vie-habitudes',
+  'personnalite-facon-de-penser',
+  'relations-vie-sociale',
+  'humour-insolite',
+  'preferences-would-you-rather',
+];
+
+/** Une option de reponse a choix multiple pour une categorie, generee par Gemini. */
+export interface WeeklyQuestionOption {
+  id: string;
+  label: string;
+}
+
+/** Question generee par Gemini pour une categorie, pour la semaine en cours. */
+export interface WeeklyQuestion {
+  category: InterestCategory;
+  categoryLabel: string;
+  prompt: string;
+  options: WeeklyQuestionOption[];
+}
+
+/**
+ * Jeu de questions de la semaine en cours - genere une fois par Gemini le lundi et
+ * partage par tout le monde, pour que le matching reste fiable (tout le monde compare
+ * les memes identifiants generes cette semaine-la). `status: 'paused'` signifie que la
+ * generation Gemini a echoue ce lundi-la - aucun cycle n'a lieu cette semaine.
+ */
+export interface WeeklyQuestionSet {
+  weekId: string;
+  status: 'ready' | 'paused';
+  generatedAt: Date;
+  questions: WeeklyQuestion[];
+}
 
 export type EmployeeStatus = 'active' | 'paused';
 
@@ -110,7 +72,13 @@ export interface EmployeeProfile {
   id: EmployeeId;
   displayName: string;
   status: EmployeeStatus;
-  interestTags: InterestTag[];
+  /**
+   * Reponses de l'employe pour la semaine en cours, sous la forme `${category}:${optionId}`
+   * (ex: "musique:opt-3") - unique et comparable par egalite exacte sans dependre du
+   * texte affiche, meme si celui-ci change chaque semaine. Efface chaque lundi.
+   */
+  interestAnswers: string[];
+  /** Disponibilites pour la semaine en cours (redemandees chaque lundi). */
   availableDays: DayOfWeek[];
   /**
    * true entre deux messages tant que l'employe est au milieu du questionnaire
@@ -119,6 +87,12 @@ export interface EmployeeProfile {
    * inconnue, et de reprendre le questionnaire a la bonne question plus tard.
    */
   interestsQuestionnaireActive: boolean;
+  /**
+   * true juste apres /rejoindre pour une nouvelle semaine (avant d'avoir donne ses
+   * disponibilites) - le prochain message texte brut est interprete comme une liste de
+   * jours plutot qu'une commande ou une reponse au questionnaire.
+   */
+  awaitingAvailability: boolean;
   /**
    * Nom de la ressource Chat (`spaces/xxx`) du DM avec l'employe, capture lors de
    * /rejoindre. Necessaire pour lui envoyer un message proactif (notification de match)
@@ -130,14 +104,22 @@ export interface EmployeeProfile {
    * (numero de choix, ou 0 pour annuler) modifie cette categorie precise plutot que la
    * prochaine question sans reponse.
    */
-  interestsEditingCategory?: InterestTag;
+  interestsEditingCategory?: InterestCategory;
   /**
-   * Categories "passees" en repondant 0 a une question du questionnaire /interets - reproposees
-   * seulement une fois toutes les autres questions sans reponse traitees. Ne participe
-   * jamais au matching (contrairement a interestTags) - sert uniquement a ordonner le
-   * questionnaire.
+   * Categorie de la question actuellement affichee dans la progression sequentielle
+   * (/interets sans argument). Fixee au moment ou la question est montree et reutilisee
+   * pour interpreter la reponse suivante - necessaire car findNextQuestion tire au
+   * hasard parmi les questions en attente, donc un nouvel appel pourrait retourner une
+   * question differente de celle vraiment affichee a l'employe.
    */
-  interestsSkippedCategories?: InterestTag[];
+  interestsCurrentCategory?: InterestCategory;
+  /**
+   * Categories "passees" en repondant 0 a une question du questionnaire /interets -
+   * reproposees seulement une fois toutes les autres questions sans reponse traitees.
+   * Ne participe jamais au matching (contrairement a interestAnswers) - sert
+   * uniquement a ordonner le questionnaire.
+   */
+  interestsSkippedCategories?: InterestCategory[];
   createdAt: Date;
   updatedAt: Date;
 }

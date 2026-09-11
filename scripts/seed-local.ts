@@ -6,45 +6,48 @@ import type { EmployeeProfile } from '../src/domain/types.js';
 /**
  * Peuple l'emulateur Firestore local avec quelques employes de test, pour pouvoir
  * declencher un cycle de matching complet sans tout saisir a la main dans l'UI.
+ * Les centres d'interet sont vides ici (ils dependent des questions generees par
+ * Gemini pour la semaine en cours - voir POST /scheduler/weekly-reset) - seules les
+ * disponibilites sont pre-remplies pour pouvoir tester le matching directement.
  * Usage: npm run emulator (terminal 1), puis npm run seed:local (terminal 2).
  */
 const sampleEmployees: Omit<
   EmployeeProfile,
-  'createdAt' | 'updatedAt' | 'interestsQuestionnaireActive'
+  'createdAt' | 'updatedAt' | 'interestsQuestionnaireActive' | 'awaitingAvailability'
 >[] = [
   {
     id: 'alice@alloprof.qc.ca',
     displayName: 'Alice',
     status: 'active',
-    interestTags: ['cuisine', 'sport'],
+    interestAnswers: [],
     availableDays: ['lundi', 'mardi'],
   },
   {
     id: 'bob@alloprof.qc.ca',
     displayName: 'Bob',
     status: 'active',
-    interestTags: ['cuisine'],
+    interestAnswers: [],
     availableDays: ['lundi'],
   },
   {
     id: 'carol@alloprof.qc.ca',
     displayName: 'Carol',
     status: 'active',
-    interestTags: ['technologie'],
+    interestAnswers: [],
     availableDays: ['mardi'],
   },
   {
     id: 'dave@alloprof.qc.ca',
     displayName: 'Dave',
     status: 'active',
-    interestTags: ['plein-air'],
+    interestAnswers: [],
     availableDays: ['jeudi'],
   },
   {
     id: 'erin@alloprof.qc.ca',
     displayName: 'Erin',
     status: 'active',
-    interestTags: ['musique', 'cinema'],
+    interestAnswers: [],
     availableDays: ['vendredi'],
   },
 ];
@@ -65,6 +68,7 @@ async function main(): Promise<void> {
     await repository.upsert({
       ...employee,
       interestsQuestionnaireActive: false,
+      awaitingAvailability: false,
       createdAt: now,
       updatedAt: now,
     });
