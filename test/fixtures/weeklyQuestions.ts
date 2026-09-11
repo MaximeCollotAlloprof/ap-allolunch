@@ -1,67 +1,12 @@
 import type { WeeklyQuestion, WeeklyQuestionSet } from '../../src/domain/types.js';
 
 /**
- * Jeu de questions de test - memes categories/libelles que l'ancien questionnaire
- * statique, pour garder les assertions de test lisibles. Les ids d'options sont des
- * chiffres 1-based (comme le numero affiche) pour que les tests restent simples a lire.
+ * Jeu de questions de test - memes 12 categories que le prompt Gemini reel (voir
+ * src/ai/geminiQuestionGenerator.ts), avec des questions/libelles simplifies pour garder
+ * les assertions de test lisibles. Les ids d'options sont des chiffres 1-based (comme le
+ * numero affiche) pour que les tests restent simples a lire.
  */
 export const TEST_QUESTIONS: WeeklyQuestion[] = [
-  {
-    category: 'cuisine',
-    categoryLabel: 'Cuisine',
-    prompt: 'Quel type de cuisine preferes-tu pour un diner ?',
-    options: [
-      { id: '1', label: 'Italienne' },
-      { id: '2', label: 'Asiatique' },
-      { id: '3', label: 'Mexicaine' },
-    ],
-  },
-  {
-    category: 'sport',
-    categoryLabel: 'Sport',
-    prompt: 'Quel sport te passionne le plus ?',
-    options: [
-      { id: '1', label: 'Hockey' },
-      { id: '2', label: 'Soccer' },
-      { id: '3', label: 'Course a pied' },
-    ],
-  },
-  {
-    category: 'voyage',
-    categoryLabel: 'Voyage',
-    prompt: 'Quel type de voyage te fait le plus rever ?',
-    options: [
-      { id: '1', label: 'Plage et detente' },
-      { id: '2', label: 'Aventure / nature' },
-    ],
-  },
-  {
-    category: 'technologie',
-    categoryLabel: 'Technologie',
-    prompt: 'Quel domaine tech t’interesse le plus ?',
-    options: [
-      { id: '1', label: 'Intelligence artificielle' },
-      { id: '2', label: 'Jeux et high-tech' },
-    ],
-  },
-  {
-    category: 'jeux-video',
-    categoryLabel: 'Jeux video',
-    prompt: 'Quel genre de jeu video preferes-tu ?',
-    options: [
-      { id: '1', label: 'Action / aventure' },
-      { id: '2', label: 'RPG' },
-    ],
-  },
-  {
-    category: 'lecture',
-    categoryLabel: 'Lecture',
-    prompt: 'Quel genre de lecture preferes-tu ?',
-    options: [
-      { id: '1', label: 'Romans' },
-      { id: '2', label: 'Polar / thriller' },
-    ],
-  },
   {
     category: 'musique',
     categoryLabel: 'Musique',
@@ -72,8 +17,8 @@ export const TEST_QUESTIONS: WeeklyQuestion[] = [
     ],
   },
   {
-    category: 'cinema',
-    categoryLabel: 'Cinema',
+    category: 'films-series-culture-pop',
+    categoryLabel: 'Films, series et culture pop',
     prompt: 'Quel genre de film preferes-tu ?',
     options: [
       { id: '1', label: 'Action' },
@@ -81,39 +26,95 @@ export const TEST_QUESTIONS: WeeklyQuestion[] = [
     ],
   },
   {
-    category: 'plein-air',
-    categoryLabel: 'Plein air',
-    prompt: 'Quelle activite de plein air preferes-tu ?',
+    category: 'cuisine-gastronomie',
+    categoryLabel: 'Cuisine et gastronomie',
+    prompt: 'Quel type de cuisine preferes-tu pour un diner ?',
     options: [
-      { id: '1', label: 'Randonnee' },
-      { id: '2', label: 'Velo' },
+      { id: '1', label: 'Italienne' },
+      { id: '2', label: 'Asiatique' },
+      { id: '3', label: 'Mexicaine' },
     ],
   },
   {
-    category: 'art-creatif',
-    categoryLabel: 'Art creatif',
-    prompt: 'Quelle activite creative te ressemble le plus ?',
+    category: 'voyages-decouvertes',
+    categoryLabel: 'Voyages et decouvertes',
+    prompt: 'Quel type de voyage te fait le plus rever ?',
     options: [
-      { id: '1', label: 'Dessin / peinture' },
-      { id: '2', label: 'Instrument de musique' },
+      { id: '1', label: 'Plage et detente' },
+      { id: '2', label: 'Aventure / nature' },
     ],
   },
   {
-    category: 'famille-enfants',
-    categoryLabel: 'Famille et enfants',
-    prompt: 'Qu’est-ce qui decrit le mieux ta situation ?',
+    category: 'sports-activites',
+    categoryLabel: 'Sports et activites',
+    prompt: 'Quel sport te passionne le plus ?',
     options: [
-      { id: '1', label: 'Parent de jeunes enfants' },
-      { id: '2', label: 'Pas d’enfants' },
+      { id: '1', label: 'Hockey' },
+      { id: '2', label: 'Soccer' },
+      { id: '3', label: 'Course a pied' },
     ],
   },
   {
-    category: 'entrepreneuriat',
-    categoryLabel: 'Entrepreneuriat',
-    prompt: 'Quel aspect de l’entrepreneuriat t’interesse le plus ?',
+    category: 'jeux-loisirs',
+    categoryLabel: 'Jeux et loisirs',
+    prompt: 'Apres le travail, quel loisir te detend le plus ?',
     options: [
-      { id: '1', label: 'Lancer une startup' },
-      { id: '2', label: 'Innovation produit' },
+      { id: '1', label: 'Jeux video' },
+      { id: '2', label: 'Jeux de societe' },
+    ],
+  },
+  {
+    category: 'culture-curiosite',
+    categoryLabel: 'Culture et curiosite',
+    prompt: "Si tu pouvais devenir expert instantanement d'un sujet, ce serait :",
+    options: [
+      { id: '1', label: 'Histoire' },
+      { id: '2', label: 'Sciences' },
+    ],
+  },
+  {
+    category: 'mode-de-vie-habitudes',
+    categoryLabel: 'Mode de vie et habitudes',
+    prompt: 'Ton rituel du matin ideal, c’est :',
+    options: [
+      { id: '1', label: 'Cafe et silence' },
+      { id: '2', label: 'Sport avant tout' },
+    ],
+  },
+  {
+    category: 'personnalite-facon-de-penser',
+    categoryLabel: 'Personnalite et facon de penser',
+    prompt: 'Face a un imprevu, tu es plutot du genre a :',
+    options: [
+      { id: '1', label: 'Planifier tout de suite' },
+      { id: '2', label: 'Improviser' },
+    ],
+  },
+  {
+    category: 'relations-vie-sociale',
+    categoryLabel: 'Relations et vie sociale',
+    prompt: 'Ta soiree ideale entre amis, c’est :',
+    options: [
+      { id: '1', label: 'Souper a la maison' },
+      { id: '2', label: 'Sortie animee' },
+    ],
+  },
+  {
+    category: 'humour-insolite',
+    categoryLabel: 'Humour et insolite',
+    prompt: 'Ton type d’humour prefere, c’est :',
+    options: [
+      { id: '1', label: 'Jeux de mots' },
+      { id: '2', label: 'Humour absurde' },
+    ],
+  },
+  {
+    category: 'preferences-would-you-rather',
+    categoryLabel: 'Preferences et "Would you rather?"',
+    prompt: 'Tu preferes...',
+    options: [
+      { id: '1', label: 'Perdre le wifi une semaine' },
+      { id: '2', label: 'Perdre le cafe une semaine' },
     ],
   },
 ];

@@ -4,8 +4,8 @@ import { TEST_QUESTIONS } from '../fixtures/weeklyQuestions.js';
 
 describe('computeSharedAnswers', () => {
   it('ne retient que les categories ou la reponse specifique est identique', () => {
-    const alice = [buildAnswerId('musique', '1'), buildAnswerId('sport', '2')];
-    const bob = [buildAnswerId('musique', '1'), buildAnswerId('sport', '3')];
+    const alice = [buildAnswerId('musique', '1'), buildAnswerId('sports-activites', '2')];
+    const bob = [buildAnswerId('musique', '1'), buildAnswerId('sports-activites', '3')];
 
     const shared = computeSharedAnswers(TEST_QUESTIONS, [alice, bob]);
 
@@ -22,9 +22,9 @@ describe('computeSharedAnswers', () => {
   });
 
   it('fonctionne pour un groupe de plus de deux personnes (tous doivent matcher)', () => {
-    const alice = [buildAnswerId('cuisine', '1')];
-    const bob = [buildAnswerId('cuisine', '1')];
-    const carol = [buildAnswerId('cuisine', '3')];
+    const alice = [buildAnswerId('cuisine-gastronomie', '1')];
+    const bob = [buildAnswerId('cuisine-gastronomie', '1')];
+    const carol = [buildAnswerId('cuisine-gastronomie', '3')];
 
     expect(computeSharedAnswers(TEST_QUESTIONS, [alice, bob, carol])).toEqual([]);
     expect(computeSharedAnswers(TEST_QUESTIONS, [alice, bob])).toEqual([

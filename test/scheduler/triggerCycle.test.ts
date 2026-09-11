@@ -126,14 +126,14 @@ describe('trigger-cycle', () => {
       availableDays: ['mardi', 'jeudi'],
       // meme reponse (musique:1 = Rock): doit apparaitre. Sport: reponses differentes,
       // meme categorie - ne doit PAS apparaitre.
-      interestAnswers: [buildAnswerId('musique', '1'), buildAnswerId('sport', '2')],
+      interestAnswers: [buildAnswerId('musique', '1'), buildAnswerId('sports-activites', '2')],
       chatSpaceName: 'spaces/alice',
     });
     const bob = employee({
       id: 'bob@example.com',
       displayName: 'Bob',
       availableDays: ['jeudi'],
-      interestAnswers: [buildAnswerId('musique', '1'), buildAnswerId('sport', '3')],
+      interestAnswers: [buildAnswerId('musique', '1'), buildAnswerId('sports-activites', '3')],
       chatSpaceName: 'spaces/bob',
     });
     const carol = employee({
@@ -199,13 +199,13 @@ describe('trigger-cycle', () => {
     const bob = employee({
       id: 'bob@example.com',
       availableDays: ['lundi'],
-      interestAnswers: [buildAnswerId('sport', '1')],
+      interestAnswers: [buildAnswerId('sports-activites', '1')],
       chatSpaceName: 'spaces/bob',
     });
     const carol = employee({
       id: 'carol@example.com',
       availableDays: ['lundi'],
-      interestAnswers: [buildAnswerId('cuisine', '1')],
+      interestAnswers: [buildAnswerId('cuisine-gastronomie', '1')],
       chatSpaceName: 'spaces/carol',
     });
 

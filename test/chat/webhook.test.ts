@@ -164,7 +164,7 @@ describe('chat webhook', () => {
     const res = await sendMessage(app, 'lundi,mardi');
 
     expect(res.text).toMatch(/Disponibilites enregistrees: lundi, mardi/);
-    expect(res.text).toMatch(/cuisine/i);
+    expect(res.text).toMatch(/musique/i);
 
     const profile = await repo.findById('alice@example.com');
     expect(profile?.availableDays).toEqual(['lundi', 'mardi']);
@@ -180,20 +180,20 @@ describe('chat webhook', () => {
     // Le profil doit fixer la categorie affichee (interestsCurrentCategory) et la
     // reutiliser telle quelle pour interpreter la reponse suivante.
     const repo = createInMemoryEmployeeRepository();
-    const sequence = [0.2, 0]; // 1er appel -> voyage (index 2/12); 2e -> cuisine (index 0/12)
+    const sequence = [0.2, 0]; // 1er appel -> cuisine-gastronomie (index 2/12); 2e -> musique (index 0/12)
     let call = 0;
     const random = () => sequence[call++ % sequence.length]!;
     const app = createApp(repo, random);
 
     await sendMessage(app, '/rejoindre');
-    const shown = await sendMessage(app, 'lundi,mardi'); // consomme sequence[0] -> voyage
-    expect(shown.text).toMatch(/voyage/i);
+    const shown = await sendMessage(app, 'lundi,mardi'); // consomme sequence[0] -> cuisine-gastronomie
+    expect(shown.text).toMatch(/cuisine/i);
 
     const res = await sendMessage(app, '1'); // ne doit PAS consommer un nouveau random pour interpreter la reponse
 
-    expect(res.text).toMatch(/Enregistre : Plage et detente/);
+    expect(res.text).toMatch(/Enregistre : Italienne/);
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestAnswers).toEqual([buildAnswerId('voyage', '1')]);
+    expect(profile?.interestAnswers).toEqual([buildAnswerId('cuisine-gastronomie', '1')]);
   });
 
   it('/pause sans profil existant renvoie un message explicite', async () => {
@@ -220,21 +220,21 @@ describe('chat webhook', () => {
     await joinAndSetAvailability(app);
     const res = await sendMessage(app, '/interets');
 
-    expect(res.text).toMatch(/cuisine/i);
-    expect(res.text).toMatch(/1\. Italienne/);
+    expect(res.text).toMatch(/musique/i);
+    expect(res.text).toMatch(/1\. Rock/);
     const profile = await repo.findById('alice@example.com');
     expect(profile?.interestsQuestionnaireActive).toBe(true);
   });
 
-  it("l'ordre des questions depend du random injecte (pas toujours cuisine en premier)", async () => {
+  it("l'ordre des questions depend du random injecte (pas toujours musique en premier)", async () => {
     const repo = createInMemoryEmployeeRepository();
-    // random proche de 1: pointe vers le dernier candidat (entrepreneuriat, 12e categorie).
+    // random proche de 1: pointe vers le dernier candidat (preferences-would-you-rather, 12e categorie).
     const app = createApp(repo, () => 0.999);
 
     await joinAndSetAvailability(app);
     const res = await sendMessage(app, '/interets');
 
-    expect(res.text).toMatch(/entrepreneuriat/i);
+    expect(res.text).toMatch(/Perdre le wifi/i);
   });
 
   it('une reponse valide (numero) enregistre la reponse et enchaine sur la question suivante', async () => {
@@ -245,10 +245,10 @@ describe('chat webhook', () => {
     await sendMessage(app, '/interets');
     const res = await sendMessage(app, '1');
 
-    expect(res.text).toMatch(/Enregistre : Italienne/);
-    expect(res.text).toMatch(/sport/i);
+    expect(res.text).toMatch(/Enregistre : Rock/);
+    expect(res.text).toMatch(/film/i);
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestAnswers).toEqual([buildAnswerId('cuisine', '1')]);
+    expect(profile?.interestAnswers).toEqual([buildAnswerId('musique', '1')]);
     expect(profile?.interestsQuestionnaireActive).toBe(true);
   });
 
@@ -261,7 +261,7 @@ describe('chat webhook', () => {
     const res = await sendMessage(app, '99');
 
     expect(res.text).toMatch(/Reponse invalide/);
-    expect(res.text).toMatch(/cuisine/i);
+    expect(res.text).toMatch(/musique/i);
     const profile = await repo.findById('alice@example.com');
     expect(profile?.interestAnswers).toEqual([]);
   });
@@ -275,10 +275,10 @@ describe('chat webhook', () => {
     const res = await sendMessage(app, '0');
 
     expect(res.text).toMatch(/Question passee/);
-    expect(res.text).toMatch(/sport/i);
+    expect(res.text).toMatch(/film/i);
     const profile = await repo.findById('alice@example.com');
     expect(profile?.interestAnswers).toEqual([]);
-    expect(profile?.interestsSkippedCategories).toEqual(['cuisine']);
+    expect(profile?.interestsSkippedCategories).toEqual(['musique']);
   });
 
   it('/interets propose la categorie suivante apres avoir passe une question (pas de redemarrage)', async () => {
@@ -287,11 +287,11 @@ describe('chat webhook', () => {
 
     await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
-    await sendMessage(app, '1'); // repond cuisine, avance sur sport
-    await sendMessage(app, '0'); // passe sport
+    await sendMessage(app, '1'); // repond musique, avance sur films/series/culture pop
+    await sendMessage(app, '0'); // passe films/series/culture pop
 
     const res = await sendMessage(app, '/interets');
-    expect(res.text).toMatch(/voyage/i);
+    expect(res.text).toMatch(/cuisine/i);
   });
 
   it('une question passee revient a la fin une fois toutes les autres traitees', async () => {
@@ -300,20 +300,20 @@ describe('chat webhook', () => {
 
     await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
-    await sendMessage(app, '0'); // passe cuisine
+    await sendMessage(app, '0'); // passe musique
 
     let last = { status: 200, text: '' };
     for (let i = 0; i < 11; i++) {
       last = await sendMessage(app, '1'); // repond aux 11 autres categories
     }
 
-    // la 11e reponse doit redemander cuisine (seule categorie restante, passee)
-    expect(last.text).toMatch(/cuisine/i);
+    // la 11e reponse doit redemander musique (seule categorie restante, passee)
+    expect(last.text).toMatch(/musique/i);
 
-    const res = await sendMessage(app, '1'); // repond enfin cuisine -> Italienne
+    const res = await sendMessage(app, '1'); // repond enfin musique -> Rock
     expect(res.text).toMatch(/complet/);
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestAnswers).toContain(buildAnswerId('cuisine', '1'));
+    expect(profile?.interestAnswers).toContain(buildAnswerId('musique', '1'));
   });
 
   it('un numero envoye sans questionnaire actif tombe sur la commande inconnue', async () => {
@@ -369,10 +369,10 @@ describe('chat webhook', () => {
 
     await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
-    await sendMessage(app, '1'); // cuisine -> Italienne
+    await sendMessage(app, '1'); // musique -> Rock
     const res = await sendMessage(app, '/profil');
 
-    expect(res.text).toMatch(/- .*\*Italienne\*/);
+    expect(res.text).toMatch(/- .*\*Rock\*/);
     expect(res.text).toMatch(/actif/);
   });
 
@@ -382,10 +382,10 @@ describe('chat webhook', () => {
 
     await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
-    await sendMessage(app, '1'); // cuisine -> Italienne
+    await sendMessage(app, '1'); // musique -> Rock
     const res = await sendMessage(app, '/interets modifier');
 
-    expect(res.text).toMatch(/1\. Cuisine: Italienne/);
+    expect(res.text).toMatch(/1\. Musique: Rock/);
     expect(res.text).not.toMatch(/Sport/);
   });
 
@@ -405,17 +405,17 @@ describe('chat webhook', () => {
 
     await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
-    await sendMessage(app, '1'); // cuisine -> Italienne
+    await sendMessage(app, '1'); // musique -> Rock
 
     const editRes = await sendMessage(app, '/interets modifier 1');
-    expect(editRes.text).toMatch(/Modifier: Cuisine/);
-    expect(editRes.text).toMatch(/Reponse actuelle: Italienne/);
+    expect(editRes.text).toMatch(/Modifier: Musique/);
+    expect(editRes.text).toMatch(/Reponse actuelle: Rock/);
 
-    const res = await sendMessage(app, '2'); // -> Asiatique
-    expect(res.text).toMatch(/Mis a jour: Cuisine: Asiatique/);
+    const res = await sendMessage(app, '2'); // -> Pop
+    expect(res.text).toMatch(/Mis a jour: Musique: Pop/);
 
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestAnswers).toEqual([buildAnswerId('cuisine', '2')]);
+    expect(profile?.interestAnswers).toEqual([buildAnswerId('musique', '2')]);
     expect(profile?.interestsEditingCategory).toBeUndefined();
   });
 
@@ -425,14 +425,14 @@ describe('chat webhook', () => {
 
     await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
-    await sendMessage(app, '1'); // cuisine -> Italienne
+    await sendMessage(app, '1'); // musique -> Rock
     await sendMessage(app, '/interets modifier 1');
 
     const res = await sendMessage(app, '0');
     expect(res.text).toMatch(/annulee/);
 
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestAnswers).toEqual([buildAnswerId('cuisine', '1')]);
+    expect(profile?.interestAnswers).toEqual([buildAnswerId('musique', '1')]);
   });
 
   it('/interets supprimer <numero> efface la reponse sans passer par une conversation', async () => {
@@ -441,14 +441,14 @@ describe('chat webhook', () => {
 
     await joinAndSetAvailability(app);
     await sendMessage(app, '/interets');
-    await sendMessage(app, '1'); // cuisine -> Italienne
-    await sendMessage(app, '1'); // sport -> Hockey
+    await sendMessage(app, '1'); // musique -> Rock
+    await sendMessage(app, '1'); // films/series/culture pop -> Action
 
     const res = await sendMessage(app, '/interets supprimer 1');
-    expect(res.text).toMatch(/Reponse supprimee pour Cuisine/);
+    expect(res.text).toMatch(/Reponse supprimee pour Musique/);
 
     const profile = await repo.findById('alice@example.com');
-    expect(profile?.interestAnswers).toEqual([buildAnswerId('sport', '1')]);
+    expect(profile?.interestAnswers).toEqual([buildAnswerId('films-series-culture-pop', '1')]);
   });
 
   it('/interets modifier <numero invalide> renvoie une erreur explicite', async () => {

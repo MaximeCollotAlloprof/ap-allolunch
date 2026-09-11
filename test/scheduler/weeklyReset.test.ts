@@ -86,7 +86,7 @@ describe('weekly-reset', () => {
     const alice = employee({
       id: 'alice@example.com',
       chatSpaceName: 'spaces/alice',
-      interestAnswers: [buildAnswerId('cuisine', '1')],
+      interestAnswers: [buildAnswerId('cuisine-gastronomie', '1')],
       availableDays: ['lundi'],
       status: 'active',
     });
@@ -123,7 +123,7 @@ describe('weekly-reset', () => {
     const alice = employee({
       id: 'alice@example.com',
       chatSpaceName: 'spaces/alice',
-      interestAnswers: [buildAnswerId('cuisine', '1')],
+      interestAnswers: [buildAnswerId('cuisine-gastronomie', '1')],
       status: 'active',
     });
     const generateWeeklyQuestions = vi.fn(() => Promise.reject(new Error('gemini down')));

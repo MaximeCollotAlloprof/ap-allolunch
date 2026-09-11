@@ -12,27 +12,35 @@ vi.mock('@google/genai', () => ({
 
 const { createGeminiQuestionGenerator } = await import('../../src/ai/geminiQuestionGenerator.js');
 
-const CATEGORIES: InterestCategory[] = ['cuisine', 'sport'];
+const CATEGORIES: InterestCategory[] = ['cuisine-gastronomie', 'sports-activites'];
+
+const CUISINE_OPTIONS = [
+  { id: 'a', label: 'Escargots' },
+  { id: 'b', label: 'Tartare' },
+  { id: 'c', label: 'Fondue' },
+  { id: 'd', label: 'Sushi' },
+];
+
+const SPORT_OPTIONS = [
+  { id: 'a', label: 'Saut a l’elastique' },
+  { id: 'b', label: 'Plongee' },
+  { id: 'c', label: 'Escalade' },
+  { id: 'd', label: 'Surf' },
+];
 
 function validGeminiResponse() {
   return {
     text: JSON.stringify({
       questions: [
         {
-          category: 'cuisine',
+          category: 'cuisine-gastronomie',
           prompt: 'Quel plat mysterieux oserais-tu commander ?',
-          options: [
-            { id: 'a', label: 'Escargots' },
-            { id: 'b', label: 'Tartare' },
-          ],
+          options: CUISINE_OPTIONS,
         },
         {
-          category: 'sport',
+          category: 'sports-activites',
           prompt: 'Quel sport extreme tenterais-tu ?',
-          options: [
-            { id: 'a', label: 'Saut a l’elastique' },
-            { id: 'b', label: 'Plongee' },
-          ],
+          options: SPORT_OPTIONS,
         },
       ],
     }),
@@ -48,13 +56,10 @@ describe('createGeminiQuestionGenerator', () => {
 
     expect(questions).toHaveLength(2);
     expect(questions[0]).toEqual({
-      category: 'cuisine',
-      categoryLabel: 'Cuisine',
+      category: 'cuisine-gastronomie',
+      categoryLabel: 'Cuisine et gastronomie',
       prompt: 'Quel plat mysterieux oserais-tu commander ?',
-      options: [
-        { id: 'a', label: 'Escargots' },
-        { id: 'b', label: 'Tartare' },
-      ],
+      options: CUISINE_OPTIONS,
     });
   });
 
@@ -67,7 +72,32 @@ describe('createGeminiQuestionGenerator', () => {
 
   it('leve une exception si le format ne respecte pas le schema attendu', async () => {
     generateContent.mockResolvedValueOnce({
-      text: JSON.stringify({ questions: [{ category: 'cuisine' }] }), // prompt/options manquants
+      text: JSON.stringify({ questions: [{ category: 'cuisine-gastronomie' }] }), // prompt/options manquants
+    });
+    const generator = createGeminiQuestionGenerator('fake-key');
+
+    await expect(generator.generateWeeklyQuestions(CATEGORIES)).rejects.toThrow(/invalide/);
+  });
+
+  it('leve une exception si une categorie a moins de 4 reponses', async () => {
+    generateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        questions: [
+          {
+            category: 'cuisine-gastronomie',
+            prompt: 'Quel plat ?',
+            options: [
+              { id: 'a', label: 'A' },
+              { id: 'b', label: 'B' },
+            ],
+          },
+          {
+            category: 'sports-activites',
+            prompt: 'Quel sport ?',
+            options: SPORT_OPTIONS,
+          },
+        ],
+      }),
     });
     const generator = createGeminiQuestionGenerator('fake-key');
 
@@ -79,20 +109,17 @@ describe('createGeminiQuestionGenerator', () => {
       text: JSON.stringify({
         questions: [
           {
-            category: 'cuisine',
+            category: 'cuisine-gastronomie',
             prompt: 'Quel plat ?',
-            options: [
-              { id: 'a', label: 'A' },
-              { id: 'b', label: 'B' },
-            ],
+            options: CUISINE_OPTIONS,
           },
-          // "sport" manquant
+          // "sports-activites" manquant
         ],
       }),
     });
     const generator = createGeminiQuestionGenerator('fake-key');
 
-    await expect(generator.generateWeeklyQuestions(CATEGORIES)).rejects.toThrow(/sport/);
+    await expect(generator.generateWeeklyQuestions(CATEGORIES)).rejects.toThrow(/sports-activites/);
   });
 
   it("propage l'erreur si l'appel a l'API echoue", async () => {

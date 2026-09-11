@@ -4,35 +4,37 @@ export type EmployeeId = string;
  * Les 12 categories larges de centres d'interet - fixes, ne changent jamais. Chaque
  * semaine, Gemini genere une question + des reponses a choix multiples POUR chacune de
  * ces categories (voir src/ai/geminiQuestionGenerator.ts) - les reponses elles-memes ne
- * sont plus une liste fermee en dur, contrairement aux categories.
+ * sont plus une liste fermee en dur, contrairement aux categories. Inspirees d'un
+ * questionnaire style appli de rencontre (gouts, personnalite, habitudes) plutot que de
+ * simples centres d'interet factuels, pour mieux faire ressortir des points communs.
  */
 export type InterestCategory =
-  | 'cuisine'
-  | 'sport'
-  | 'voyage'
-  | 'technologie'
-  | 'jeux-video'
-  | 'lecture'
   | 'musique'
-  | 'cinema'
-  | 'plein-air'
-  | 'art-creatif'
-  | 'famille-enfants'
-  | 'entrepreneuriat';
+  | 'films-series-culture-pop'
+  | 'cuisine-gastronomie'
+  | 'voyages-decouvertes'
+  | 'sports-activites'
+  | 'jeux-loisirs'
+  | 'culture-curiosite'
+  | 'mode-de-vie-habitudes'
+  | 'personnalite-facon-de-penser'
+  | 'relations-vie-sociale'
+  | 'humour-insolite'
+  | 'preferences-would-you-rather';
 
 export const INTEREST_CATEGORIES: readonly InterestCategory[] = [
-  'cuisine',
-  'sport',
-  'voyage',
-  'technologie',
-  'jeux-video',
-  'lecture',
   'musique',
-  'cinema',
-  'plein-air',
-  'art-creatif',
-  'famille-enfants',
-  'entrepreneuriat',
+  'films-series-culture-pop',
+  'cuisine-gastronomie',
+  'voyages-decouvertes',
+  'sports-activites',
+  'jeux-loisirs',
+  'culture-curiosite',
+  'mode-de-vie-habitudes',
+  'personnalite-facon-de-penser',
+  'relations-vie-sociale',
+  'humour-insolite',
+  'preferences-would-you-rather',
 ];
 
 /** Une option de reponse a choix multiple pour une categorie, generee par Gemini. */
